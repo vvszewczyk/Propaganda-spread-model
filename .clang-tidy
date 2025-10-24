@@ -1,0 +1,69 @@
+---
+Checks: >
+  -*,
+
+  # Memory leaks etc.
+  clang-analyzer-*,
+  bugprone-*,
+
+  # Efficiency (allocations, copies, iterators)
+  performance-*,
+
+  # Modern C++ and RAII
+  modernize-*,
+  -modernize-use-trailing-return-type,
+
+  # Core Guidelines
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-c-arrays,
+
+  # Readability
+  readability-misleading-indentation,
+  readability-simplify-boolean-expr,
+  readability-redundant-declaration,
+  readability-redundant-smartptr-get,
+  readability-container-size-empty,
+  readability-deleted-default,
+  readability-inconsistent-declaration-parameter-name,
+
+  # Miscellaneous
+  misc-const-correctness,
+  misc-throw-by-value-catch-by-reference,
+  misc-redundant-expression,
+  misc-unused-alias-decls,
+  misc-unused-parameters,
+
+  # Portability
+  portability-simd-intrinsics,
+  portability-std-allocator-const
+
+HeaderFilterRegex: '^(include|src)/'
+WarningsAsErrors: ''
+AnalyzeTemporaryDtors: false
+FormatStyle: file
+
+CheckOptions:
+  - { key: readability-identifier-naming.VariableCase,         value: camelBack }
+  - { key: readability-identifier-naming.FunctionCase,         value: camelBack }
+  - { key: readability-identifier-naming.ClassCase,            value: CamelCase }
+  - { key: readability-identifier-naming.NamespaceCase,        value: CamelCase }
+  - { key: readability-identifier-naming.PrivateMemberPrefix,  value: m_ }
+  - { key: readability-identifier-naming.ConstantCase,         value: UPPER_CASE }
+
+  - { key: readability-redundant-declaration.IgnoreMacros,     value: 'true' }
+
+  - { key: modernize-use-nodiscard.ReplacementString,          value: '[[nodiscard]]' }
+  - { key: modernize-use-nodiscard.IgnorePositives,            value: 'true' }
+
+  - { key: modernize-make-unique.IgnoreMacros,                 value: 'true' }
+  - { key: modernize-make-shared.IgnoreMacros,                 value: 'true' }
+
+  - { key: misc-const-correctness.IgnoreMacros,                value: 'true' }
+
+  - { key: clang-analyzer-cplusplus.NewDeleteLeaks:Enabled,    value: 'true' }
+  - { key: clang-analyzer-cplusplus.Move:Enabled,              value: 'true' }
+  - { key: clang-analyzer-deadcode.DeadStores:Enabled,         value: 'true' }
+...

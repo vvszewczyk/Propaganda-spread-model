@@ -1,0 +1,217 @@
+#include "MainWindow.hpp"
+
+#include "Constants.hpp"
+
+#include <memory>
+#include <qglobal.h>
+
+MainWindow::MainWindow(QWidget* parent)
+    : QMainWindow(parent),
+      contentStack(new QStackedWidget(centralWidget())),
+      gridWidget(new GridWidget(this)),
+      statsWidget(new QWidget(this)),
+      m_usMap(std::make_unique<UsMap>("../../../map/us.svg", Config::gridCols, Config::gridRows)),
+      sim(new Simulation(Config::gridCols, Config::gridRows)),
+      timer(new QTimer(this)),
+      simulationLabel(new QLabel("Simulation settings", this)),
+      iterationLabel(new QLabel("Iteration: 0", this)),
+      neighbourhoodLabel(new QLabel("Neighbourhood", this)),
+      startButton(new QPushButton("Start", this)),
+      resetButton(new QPushButton("Reset", this)),
+      toggleViewButton(new QPushButton("Show stats", this)),
+      gridToggle(new QCheckBox("Show grid", this)),
+      neighbourhoodCombo(new QComboBox(this))
+{
+    setFixedSize(Config::windowWidth, Config::windowHeight);
+    setupUI();
+    setupStats();
+    setupLayout();
+    setupConnections();
+}
+
+void MainWindow::setupUI()
+{
+    this->gridWidget->setFixedSize(Config::gridPixelWidth, Config::gridPixelHeight);
+    this->gridWidget->setSimulation(sim.get());
+    QString errorMessage;
+    if (!m_usMap->buildProducts(&errorMessage))
+    {
+        qWarning() << "Failed to build US map products:" << errorMessage;
+    }
+    this->gridWidget->setUsMap(m_usMap.get());
+    this->gridToggle->setChecked(true);
+
+    neighbourhoodCombo->addItem("Von Neumann");
+    neighbourhoodCombo->addItem("Moore");
+    neighbourhoodCombo->setCurrentIndex(0);
+
+    toggleViewButton->setCheckable(true);
+    toggleViewButton->setChecked(false);
+}
+
+void MainWindow::setupLayout()
+{
+    QWidget* centralWidget = new QWidget(this);
+    setCentralWidget(centralWidget);
+    // centralWidget->setStyleSheet(Config::centralWidgetColor); // lightgreen
+
+    QHBoxLayout* mainLayout = new QHBoxLayout(centralWidget);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+
+    QWidget* left = new QWidget(centralWidget);
+    left->setStyleSheet(Config::leftBlockColor);
+    QVBoxLayout* leftLayout = new QVBoxLayout(left);
+
+    contentStack->addWidget(gridWidget);
+    contentStack->addWidget(statsWidget);
+    contentStack->setCurrentIndex(0);
+
+    leftLayout->addWidget(contentStack, 1);
+    leftLayout->addStretch();
+    mainLayout->addWidget(left, 7);
+
+    QWidget* right = new QWidget(centralWidget);
+    // right->setStyleSheet(Config::rightBlockColor);
+    QVBoxLayout* rightLayout = new QVBoxLayout(right);
+
+    rightLayout->addWidget(simulationLabel);
+
+    // Start/pause and reset buttons
+    QHBoxLayout* btnRow = new QHBoxLayout();
+    btnRow->addStretch();
+    btnRow->addWidget(startButton);
+    btnRow->addSpacing(5); // Space between buttons
+    btnRow->addWidget(resetButton);
+    btnRow->addStretch();
+    rightLayout->addLayout(btnRow);
+
+    QHBoxLayout* spinRow = new QHBoxLayout();
+    rightLayout->addLayout(spinRow);
+
+    // Neighbourhood combobox
+    rightLayout->addWidget(neighbourhoodLabel);
+    rightLayout->addWidget(neighbourhoodCombo);
+
+    // Checkboxes
+    QHBoxLayout* chckbxRow = new QHBoxLayout();
+    chckbxRow->addStretch();
+    chckbxRow->addWidget(gridToggle);
+    chckbxRow->addStretch(); // Push checkbox up
+    rightLayout->addLayout(chckbxRow);
+
+    rightLayout->addStretch();
+
+    // Grid/stats button
+    rightLayout->addWidget(toggleViewButton, 0, Qt::AlignCenter);
+
+    // Iterations label
+    rightLayout->addWidget(iterationLabel, 0, Qt::AlignRight);
+
+    // Add right panel to main layout
+    mainLayout->addWidget(right, 1);
+}
+
+void MainWindow::setupStats()
+{
+}
+
+void MainWindow::setupConnections()
+{
+    connect(startButton, SIGNAL(clicked()), this,
+            SLOT(onStartButtonClicked())); // Start button event
+    connect(resetButton, SIGNAL(clicked()), this,
+            SLOT(onResetButtonClicked())); // Reset button event
+    connect(gridToggle, &QCheckBox::toggled, gridWidget, &GridWidget::setShowGrid);
+    connect(toggleViewButton, SIGNAL(toggled(bool)), this,
+            SLOT(onToggleView(bool)));                       // Toggle view button
+    connect(timer, SIGNAL(timeout()), this, SLOT(onStep())); // Timer timeout
+    connect(neighbourhoodCombo, SIGNAL(currentIndexChanged(int)), this,
+            SLOT(onNeighbourhoodChanged(int))); // Neighbourhood combobox
+}
+
+// Widget methods
+
+void MainWindow::onStartButtonClicked()
+{
+    if (timer->isActive())
+    {
+        timer->stop();
+        startButton->setText("Start");
+    }
+    else
+    {
+        timer->start(100);
+        startButton->setText("Pause");
+    }
+}
+
+void MainWindow::onResetButtonClicked()
+{
+    timer->stop();
+    startButton->setText("Start");
+    sim->reset();
+    gridWidget->update();
+    clearStats();
+    updateIterationLabel(0);
+}
+
+void MainWindow::onStep()
+{
+    // CA
+    sim->step();
+    gridWidget->update();
+
+    // int globalStep = sim->getIteration();
+    // updateIterationLabel(globalStep);
+
+    if (contentStack->currentIndex() == 1)
+    {
+        // updateStats(globalStep);
+    }
+}
+
+void MainWindow::updateIterationLabel(int globalStep)
+{
+    iterationLabel->setText(QString("Iteration: %1").arg(globalStep));
+}
+
+void MainWindow::onNeighbourhoodChanged(int index)
+{
+    NeighbourhoodType chosenNeighbourhoodType = NeighbourhoodType::VON_NEUMANN;
+
+    if (index == 0)
+    {
+        chosenNeighbourhoodType = NeighbourhoodType::VON_NEUMANN;
+    }
+    else if (index == 1)
+    {
+        chosenNeighbourhoodType = NeighbourhoodType::MOORE;
+    }
+    sim->setNeighbourhoodType(chosenNeighbourhoodType);
+}
+
+void MainWindow::onToggleView(bool checked)
+{
+    // int globalStep = sim->getIteration();
+    if (checked)
+    {
+        contentStack->setCurrentIndex(1);
+        toggleViewButton->setText("Show simulation");
+        // updateStats(globalStep);
+    }
+    else
+    {
+        contentStack->setCurrentIndex(0);
+        toggleViewButton->setText("Show stats");
+    }
+}
+
+void MainWindow::updateStats(int globalStep)
+{
+}
+
+void MainWindow::clearStats()
+{
+}
+
+MainWindow::~MainWindow() = default;
