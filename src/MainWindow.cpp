@@ -4,15 +4,17 @@
 
 #include <memory>
 #include <qglobal.h>
+#include <qwidget.h>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
       contentStack(new QStackedWidget(centralWidget())),
       gridWidget(new GridWidget(this)),
-      statsWidget(new QWidget(this)),
-      m_usMap(std::make_unique<UsMap>("../../../map/us.svg", Config::gridCols, Config::gridRows)),
-      sim(new Simulation(Config::gridCols, Config::gridRows)),
-      timer(new QTimer(this)),
+      m_statsWidget(std::make_unique<QWidget>(this)),
+      m_usMap(
+          std::make_unique<UsMap>("../../../map/us_test.svg", Config::gridCols, Config::gridRows)),
+      m_simulation(std::make_unique<Simulation>(Config::gridCols, Config::gridRows)),
+      m_timer(std::make_unique<QTimer>(this)),
       simulationLabel(new QLabel("Simulation settings", this)),
       iterationLabel(new QLabel("Iteration: 0", this)),
       neighbourhoodLabel(new QLabel("Neighbourhood", this)),
@@ -32,7 +34,10 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::setupUI()
 {
     this->gridWidget->setFixedSize(Config::gridPixelWidth, Config::gridPixelHeight);
-    this->gridWidget->setSimulation(sim.get());
+    this->gridWidget->setSimulation(m_simulation.get());
+
+    m_usMap->setDebug(false, "../../../usmap_debug");
+    m_usMap->setDebugColorizeStates(false);
     QString errorMessage;
     if (!m_usMap->buildProducts(&errorMessage))
     {
@@ -63,7 +68,7 @@ void MainWindow::setupLayout()
     QVBoxLayout* leftLayout = new QVBoxLayout(left);
 
     contentStack->addWidget(gridWidget);
-    contentStack->addWidget(statsWidget);
+    contentStack->addWidget(m_statsWidget.get());
     contentStack->setCurrentIndex(0);
 
     leftLayout->addWidget(contentStack, 1);
@@ -123,8 +128,8 @@ void MainWindow::setupConnections()
             SLOT(onResetButtonClicked())); // Reset button event
     connect(gridToggle, &QCheckBox::toggled, gridWidget, &GridWidget::setShowGrid);
     connect(toggleViewButton, SIGNAL(toggled(bool)), this,
-            SLOT(onToggleView(bool)));                       // Toggle view button
-    connect(timer, SIGNAL(timeout()), this, SLOT(onStep())); // Timer timeout
+            SLOT(onToggleView(bool)));                               // Toggle view button
+    connect(m_timer.get(), SIGNAL(timeout()), this, SLOT(onStep())); // Timer timeout
     connect(neighbourhoodCombo, SIGNAL(currentIndexChanged(int)), this,
             SLOT(onNeighbourhoodChanged(int))); // Neighbourhood combobox
 }
@@ -133,23 +138,23 @@ void MainWindow::setupConnections()
 
 void MainWindow::onStartButtonClicked()
 {
-    if (timer->isActive())
+    if (m_timer->isActive())
     {
-        timer->stop();
+        m_timer->stop();
         startButton->setText("Start");
     }
     else
     {
-        timer->start(100);
+        m_timer->start(100);
         startButton->setText("Pause");
     }
 }
 
 void MainWindow::onResetButtonClicked()
 {
-    timer->stop();
+    m_timer->stop();
     startButton->setText("Start");
-    sim->reset();
+    m_simulation->reset();
     gridWidget->update();
     clearStats();
     updateIterationLabel(0);
@@ -158,7 +163,7 @@ void MainWindow::onResetButtonClicked()
 void MainWindow::onStep()
 {
     // CA
-    sim->step();
+    m_simulation->step();
     gridWidget->update();
 
     // int globalStep = sim->getIteration();
@@ -187,7 +192,7 @@ void MainWindow::onNeighbourhoodChanged(int index)
     {
         chosenNeighbourhoodType = NeighbourhoodType::MOORE;
     }
-    sim->setNeighbourhoodType(chosenNeighbourhoodType);
+    m_simulation->setNeighbourhoodType(chosenNeighbourhoodType);
 }
 
 void MainWindow::onToggleView(bool checked)

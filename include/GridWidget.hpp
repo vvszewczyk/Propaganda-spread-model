@@ -10,12 +10,16 @@
 class GridWidget : public QWidget
 {
         Q_OBJECT
-        Simulation* m_sim;
-        UsMap*      m_usMap;
-        bool        m_showGrid;
-        bool        m_eraseMode;
-        bool        m_debugShowSingleState = false;
-        QString     m_debugStateId         = "CA";
+        Simulation*        m_sim;
+        UsMap*             m_usMap;
+        bool               m_showGrid;
+        bool               m_eraseMode;
+        QSet<int>          m_selectedStateIds;
+        int                m_selectedSingleStateId = -1;
+        QHash<int, QColor> m_coloredStates;
+
+        int    m_hoverSid = -1;
+        QImage m_cellsImage;
 
     public:
         explicit GridWidget(QWidget* parent = nullptr);
@@ -24,7 +28,6 @@ class GridWidget : public QWidget
         void   setShowGrid(bool);
         void   setEraseMode(bool);
         QColor getColorForCell(CellData) const;
-        void   setDebugSingleState(bool on, QString id = "CA");
 
     signals:
         void cellRemoved(int x, int y);
@@ -32,4 +35,6 @@ class GridWidget : public QWidget
     protected:
         void paintEvent(QPaintEvent*) override;
         void mousePressEvent(QMouseEvent*) override;
+        void mouseMoveEvent(QMouseEvent* event) override;
+        void leaveEvent(QEvent* event) override;
 };

@@ -28,7 +28,7 @@ struct CellData
         State             state;
         Side              side;
         NeighbourhoodType neighbourhoodType;
-        float             resilience = 0.3f;
+        float             resilience = 0.0f;
         float             fatigue    = 0.0f;
         bool              active     = true;
         uint8_t           stateId    = 0;

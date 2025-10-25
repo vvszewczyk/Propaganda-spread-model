@@ -18,6 +18,8 @@
 #include <QVBoxLayout>
 #include <QtCharts>
 #include <QtWidgets/QMainWindow>
+#include <memory>
+#include <qwidget.h>
 
 class MainWindow : public QMainWindow
 {
@@ -31,12 +33,13 @@ class MainWindow : public QMainWindow
         auto operator=(MainWindow&&) -> MainWindow&      = delete;
 
     private:
-        QStackedWidget*             contentStack;
-        GridWidget*                 gridWidget;
-        QWidget*                    statsWidget;
+        QStackedWidget*          contentStack;
+        GridWidget*              gridWidget;
+        std::unique_ptr<QWidget> m_statsWidget;
+
         std::unique_ptr<UsMap>      m_usMap;
-        std::unique_ptr<Simulation> sim;
-        QTimer*                     timer;
+        std::unique_ptr<Simulation> m_simulation;
+        std::unique_ptr<QTimer>     m_timer;
 
         QLabel* simulationLabel;
         QLabel* iterationLabel;
