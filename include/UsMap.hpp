@@ -40,12 +40,11 @@ class UsMap
         uint8_t stateAtViewPos(QPointF position, QSize viewSize) const;
 
         static std::span<const char* const> abbrevs();
-        static std::optional<int>           indexOfAbbrev(QString twoLetterAbbrev);
 
-        bool loadSvgPatched(QString* errorMessage);
-        void setDebug(bool on, QString dumpDir = {});
-        void setDebugColorizeStates(bool on);
-        ;
+        bool    loadSvgPatched(QString* errorMessage);
+        void    setDebug(bool on, QString dumpDir = {});
+        void    setDebugColorizeStates(bool on);
+        QString getStateName(uint8_t stateId) const;
 
     private:
         static const std::array<const char* const, 51> m_stateIDs;
@@ -58,6 +57,7 @@ class UsMap
         QPixmap              m_borderPixmap;
         QByteArray           m_svgRaw;
         QHash<QRgb, uint8_t> m_colorToState;
+        std::vector<QString> m_stateNames;
 
         QImage m_maskImage;
         QImage m_layerImage;

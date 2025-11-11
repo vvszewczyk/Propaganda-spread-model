@@ -138,12 +138,14 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
             m_coloredStates[stateId] = QColor(0, 255, 0, 110);
     }
 
-    update();
-
-    const char*   abbr = UsMap::abbrevs()[sid];
-    const QString txt  = QStringLiteral("State: %1").arg(abbr);
+    m_selectedSingleStateId = sid;
+    const QString full      = m_usMap->getStateName(sid);
+    const QString abbr      = QString::fromLatin1(UsMap::abbrevs()[sid]);
+    const QString txt       = full.isEmpty() ? QStringLiteral("State: %1").arg(abbr)
+                                             : QStringLiteral("State: %1 (%2)").arg(full, abbr);
     setToolTip(txt);
-    QToolTip::showText(event->globalPos(), txt, this, QRect(), 4000);
+    QToolTip::showText(event->globalPos(), txt, this, QRect(), 3000);
+    update();
 }
 
 void GridWidget::mouseMoveEvent(QMouseEvent* event)

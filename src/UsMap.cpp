@@ -4,9 +4,10 @@
 #include <QDir>
 #include <QFile>
 #include <QPainter>
+#include <QRegularExpression>
+#include <QStringView>
 #include <QtMath>
 #include <cstdint>
-#include <qregularexpression.h>
 
 const std::array<const char* const, 51> UsMap::m_stateIDs = {
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL",
@@ -22,6 +23,12 @@ UsMap::UsMap(QString svgFilePath, int cols, int rows)
     m_outputProducts.stateIds.resize(
         static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows), kNoState);
     m_statePixelCount.assign(m_stateIDs.size(), 0);
+
+    m_stateNames.resize(m_stateIDs.size());
+    for (std::size_t i = 0; i < m_stateIDs.size(); ++i)
+    {
+        m_stateNames[i] = QString::fromLatin1(m_stateIDs[i]);
+    }
 }
 
 bool UsMap::buildProducts(QString* errorMessage)
@@ -231,9 +238,9 @@ bool UsMap::buildColorMapFromSvg()
     m_colorToState.clear();
     const QString svg = QString::fromUtf8(m_svgRaw);
 
-    for (int sid = 0; sid < (int)m_stateIDs.size(); ++sid)
+    for (std::size_t stateId = 0; stateId < m_stateIDs.size(); ++stateId)
     {
-        const QString id = QString::fromLatin1(m_stateIDs[sid]);
+        const QString id = QString::fromLatin1(m_stateIDs[stateId]);
 
         QRegularExpression reTag(
             QStringLiteral(R"(id\s*=\s*"%1"[^>]*>)").arg(QRegularExpression::escape(id)),
@@ -245,14 +252,24 @@ bool UsMap::buildColorMapFromSvg()
             qWarning() << "[UsMap] id not found in SVG:" << id;
             continue;
         }
-        const int tagEnd   = m.capturedEnd();
-        int       tagStart = svg.lastIndexOf('<', m.capturedStart());
+        const qsizetype tagEnd   = m.capturedEnd();
+        qsizetype       tagStart = svg.lastIndexOf('<', m.capturedStart());
         if (tagStart < 0 || tagEnd <= tagStart)
         {
             qWarning() << "[UsMap] malformed tag for id:" << id;
             continue;
         }
         const QString tag = svg.mid(tagStart, tagEnd - tagStart);
+
+        {
+            QRegularExpression      reName(QStringLiteral("data-name\\s*=\\s*\"([^\"]*)\""),
+                                           QRegularExpression::CaseInsensitiveOption);
+            QRegularExpressionMatch mName = reName.match(tag);
+            if (mName.hasMatch())
+            {
+                m_stateNames[stateId] = mName.captured(1).trimmed();
+            }
+        }
 
         QRegularExpression      reFill("fill\\s*=\\s*\"(#[0-9a-fA-F]{6})\"");
         QRegularExpressionMatch mf = reFill.match(tag);
@@ -283,7 +300,7 @@ bool UsMap::buildColorMapFromSvg()
         if (auto rgb = parseHexColor(hex))
         {
             const QRgb key = *rgb;
-            m_colorToState.insert(key, static_cast<uint8_t>(sid));
+            m_colorToState.insert(key, static_cast<uint8_t>(stateId));
             qDebug() << "[UsMap] color map:" << id << hex;
         }
         else
@@ -329,25 +346,19 @@ void UsMap::drawBackground(QPainter& painter, const QRect& rect) const
 uint8_t UsMap::stateAtViewPos(QPointF position, QSize viewSize) const
 {
     if (!m_productsBuilt || viewSize.width() <= 0 || viewSize.height() <= 0)
-        return kNoState;
-    const float sx = float(m_outputProducts.cols) / float(viewSize.width());
-    const float sy = float(m_outputProducts.rows) / float(viewSize.height());
-    int         x  = int(position.x() * sx);
-    int         y  = int(position.y() * sy);
-    if (x < 0 || y < 0 || x >= m_outputProducts.cols || y >= m_outputProducts.rows)
-        return kNoState;
-    return m_outputProducts.stateIds[y * m_outputProducts.cols + x];
-}
-
-std::optional<int> UsMap::indexOfAbbrev(QString twoLetterAbbrev)
-{
-    QString abbrev = twoLetterAbbrev.trimmed().toUpper();
-    for (int i = 0; i < (int)m_stateIDs.size(); ++i)
     {
-        if (abbrev == QLatin1String(m_stateIDs[i]))
-            return i;
+        return kNoState;
     }
-    return std::nullopt;
+    const auto sx = static_cast<qreal>(m_outputProducts.cols) / viewSize.width();
+    const auto sy = static_cast<qreal>(m_outputProducts.rows) / viewSize.height();
+    int        x  = static_cast<int>(position.x() * sx);
+    int        y  = static_cast<int>(position.y() * sy);
+
+    if (x < 0 || y < 0 || x >= m_outputProducts.cols || y >= m_outputProducts.rows)
+    {
+        return kNoState;
+    }
+    return m_outputProducts.stateIds[static_cast<std::size_t>(y * m_outputProducts.cols + x)];
 }
 
 QRectF UsMap::svgViewBox() const
@@ -388,4 +399,17 @@ void UsMap::debugSave(const QString& name, const QImage& img) const
     const QString path = m_debugDir + "/" + name;
     img.save(path);
     qDebug() << "[UsMap] saved" << path;
+}
+
+QString UsMap::getStateName(uint8_t stateId) const
+{
+    if (stateId == kNoState)
+    {
+        return {};
+    }
+    if (stateId >= m_stateNames.size())
+    {
+        return {};
+    }
+    return m_stateNames[stateId];
 }

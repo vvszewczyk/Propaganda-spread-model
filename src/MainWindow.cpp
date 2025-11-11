@@ -11,8 +11,8 @@ MainWindow::MainWindow(QWidget* parent)
       contentStack(new QStackedWidget(centralWidget())),
       gridWidget(new GridWidget(this)),
       m_statsWidget(std::make_unique<QWidget>(this)),
-      m_usMap(
-          std::make_unique<UsMap>("../../../map/us_test.svg", Config::gridCols, Config::gridRows)),
+      m_usMap(std::make_unique<UsMap>(
+          "Propaganda-spread-model/map/us_test.svg", Config::gridCols, Config::gridRows)),
       m_simulation(std::make_unique<Simulation>(Config::gridCols, Config::gridRows)),
       m_timer(std::make_unique<QTimer>(this)),
       simulationLabel(new QLabel("Simulation settings", this)),
