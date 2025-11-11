@@ -5,21 +5,16 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QFileDialog>
 #include <QHBoxLayout>
-#include <QKeyEvent>
 #include <QLabel>
 #include <QMainWindow>
-#include <QMessageBox>
 #include <QPushButton>
-#include <QSlider>
-#include <QSpinBox>
+#include <QStackedWidget>
 #include <QTimer>
 #include <QVBoxLayout>
-#include <QtCharts>
-#include <QtWidgets/QMainWindow>
+// #include <QtCharts>
+// #include <QtWidgets/QMainWindow>
 #include <memory>
-#include <qwidget.h>
 
 class MainWindow : public QMainWindow
 {
@@ -27,10 +22,10 @@ class MainWindow : public QMainWindow
     public:
         MainWindow(QWidget* parent = nullptr);
         ~MainWindow() override;
-        MainWindow(const MainWindow&)                    = delete;
-        auto operator=(const MainWindow&) -> MainWindow& = delete;
-        MainWindow(MainWindow&&)                         = delete;
-        auto operator=(MainWindow&&) -> MainWindow&      = delete;
+        MainWindow(const MainWindow&)            = delete;
+        MainWindow& operator=(const MainWindow&) = delete;
+        MainWindow(MainWindow&&)                 = delete;
+        MainWindow& operator=(MainWindow&&)      = delete;
 
     private:
         QStackedWidget*          contentStack;
@@ -41,18 +36,14 @@ class MainWindow : public QMainWindow
         std::unique_ptr<Simulation> m_simulation;
         std::unique_ptr<QTimer>     m_timer;
 
-        QLabel* simulationLabel;
-        QLabel* iterationLabel;
-        QLabel* neighbourhoodLabel;
-        QLabel* iterationValueLabel;
-
+        QLabel*      simulationLabel;
+        QLabel*      iterationLabel;
+        QLabel*      neighbourhoodLabel;
         QPushButton* startButton;
         QPushButton* resetButton;
         QPushButton* toggleViewButton;
-
-        QCheckBox* gridToggle;
-
-        QComboBox* neighbourhoodCombo;
+        QCheckBox*   gridToggle;
+        QComboBox*   neighbourhoodCombo;
 
         void setupUI();
         void setupLayout();
@@ -66,7 +57,6 @@ class MainWindow : public QMainWindow
         void onStartButtonClicked();
         void onResetButtonClicked();
         void onStep();
-
         void onNeighbourhoodChanged(int index);
         void onToggleView(bool checked);
 };

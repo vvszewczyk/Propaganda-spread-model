@@ -2,9 +2,9 @@
 
 #include "Constants.hpp"
 
+#include <QDebug>
+#include <QWidget>
 #include <memory>
-#include <qglobal.h>
-#include <qwidget.h>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -56,16 +56,16 @@ void MainWindow::setupUI()
 
 void MainWindow::setupLayout()
 {
-    QWidget* centralWidget = new QWidget(this);
+    auto* centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
     // centralWidget->setStyleSheet(Config::centralWidgetColor); // lightgreen
 
-    QHBoxLayout* mainLayout = new QHBoxLayout(centralWidget);
+    auto* mainLayout = new QHBoxLayout(centralWidget);
     mainLayout->setContentsMargins(0, 0, 0, 0);
 
-    QWidget* left = new QWidget(centralWidget);
+    auto* left = new QWidget(centralWidget);
     left->setStyleSheet(Config::leftBlockColor);
-    QVBoxLayout* leftLayout = new QVBoxLayout(left);
+    auto* leftLayout = new QVBoxLayout(left);
 
     contentStack->addWidget(gridWidget);
     contentStack->addWidget(m_statsWidget.get());
@@ -75,14 +75,14 @@ void MainWindow::setupLayout()
     leftLayout->addStretch();
     mainLayout->addWidget(left, 7);
 
-    QWidget* right = new QWidget(centralWidget);
+    auto* right = new QWidget(centralWidget);
     // right->setStyleSheet(Config::rightBlockColor);
-    QVBoxLayout* rightLayout = new QVBoxLayout(right);
+    auto* rightLayout = new QVBoxLayout(right);
 
     rightLayout->addWidget(simulationLabel);
 
     // Start/pause and reset buttons
-    QHBoxLayout* btnRow = new QHBoxLayout();
+    auto* btnRow = new QHBoxLayout();
     btnRow->addStretch();
     btnRow->addWidget(startButton);
     btnRow->addSpacing(5); // Space between buttons
@@ -90,19 +90,16 @@ void MainWindow::setupLayout()
     btnRow->addStretch();
     rightLayout->addLayout(btnRow);
 
-    QHBoxLayout* spinRow = new QHBoxLayout();
-    rightLayout->addLayout(spinRow);
-
     // Neighbourhood combobox
     rightLayout->addWidget(neighbourhoodLabel);
     rightLayout->addWidget(neighbourhoodCombo);
 
     // Checkboxes
-    QHBoxLayout* chckbxRow = new QHBoxLayout();
-    chckbxRow->addStretch();
-    chckbxRow->addWidget(gridToggle);
-    chckbxRow->addStretch(); // Push checkbox up
-    rightLayout->addLayout(chckbxRow);
+    auto* checkboxRow = new QHBoxLayout();
+    checkboxRow->addStretch();
+    checkboxRow->addWidget(gridToggle);
+    checkboxRow->addStretch(); // Push checkbox up
+    rightLayout->addLayout(checkboxRow);
 
     rightLayout->addStretch();
 
@@ -166,9 +163,6 @@ void MainWindow::onStep()
     m_simulation->step();
     gridWidget->update();
 
-    // int globalStep = sim->getIteration();
-    // updateIterationLabel(globalStep);
-
     if (contentStack->currentIndex() == 1)
     {
         // updateStats(globalStep);
@@ -182,7 +176,7 @@ void MainWindow::updateIterationLabel(int globalStep)
 
 void MainWindow::onNeighbourhoodChanged(int index)
 {
-    NeighbourhoodType chosenNeighbourhoodType = NeighbourhoodType::VON_NEUMANN;
+    auto chosenNeighbourhoodType = NeighbourhoodType::VON_NEUMANN;
 
     if (index == 0)
     {
@@ -197,17 +191,16 @@ void MainWindow::onNeighbourhoodChanged(int index)
 
 void MainWindow::onToggleView(bool checked)
 {
-    // int globalStep = sim->getIteration();
     if (checked)
     {
         contentStack->setCurrentIndex(1);
-        toggleViewButton->setText("Show simulation");
+        toggleViewButton->setText(QStringLiteral("Show simulation"));
         // updateStats(globalStep);
     }
     else
     {
         contentStack->setCurrentIndex(0);
-        toggleViewButton->setText("Show stats");
+        toggleViewButton->setText(QStringLiteral("Show stats"));
     }
 }
 

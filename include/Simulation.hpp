@@ -17,9 +17,9 @@ class Simulation
 
         void step();
 
-        int             getCols() const;
-        int             getRows() const;
-        const CellData& cell(int x, int y) const;
+        [[nodiscard]] int             getCols() const;
+        [[nodiscard]] int             getRows() const;
+        [[nodiscard]] const CellData& cell(int x, int y) const;
 
     private:
         int                   m_cols;

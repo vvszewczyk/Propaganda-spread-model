@@ -4,147 +4,201 @@
 #include "Simulation.hpp"
 
 #include <QPainter>
-#include <qstringliteral.h>
-#include <qtooltip.h>
+#include <QStringLiteral>
+#include <QToolTip>
+#include <qcolor.h>
+#include <qpainter.h>
+#include <qtypes.h>
 
-GridWidget::GridWidget(QWidget* parent) : QWidget{parent}, m_sim{nullptr}, m_showGrid{true}
+GridWidget::GridWidget(QWidget* parent) : QWidget{parent}
 {
 }
 
-void GridWidget::setSimulation(const Simulation* simulation)
+void GridWidget::setSimulation(const Simulation* simulation) noexcept
 {
-    this->m_sim = const_cast<Simulation*>(simulation);
-}
-
-void GridWidget::setUsMap(const UsMap* usMap)
-{
-    this->m_usMap = const_cast<UsMap*>(usMap);
-}
-
-void GridWidget::setShowGrid(bool value)
-{
-    this->m_showGrid = value;
+    this->m_sim = simulation;
     update();
 }
 
-void GridWidget::setEraseMode(bool value)
+void GridWidget::setUsMap(const UsMap* usMap) noexcept
 {
-    m_eraseMode = value;
+    this->m_usMap = usMap;
+    update();
 }
 
-QColor GridWidget::getColorForCell(CellData cell) const
+void GridWidget::setShowGrid(bool on) noexcept
 {
-    if (cell.state == State::S)
+    this->m_showGrid = on;
+    update();
+}
+
+QColor GridWidget::getColorFor(CellData cell) const noexcept
+{
+    switch (cell.state)
     {
+    case State::S:
         return Qt::white;
-    }
-    else if (cell.state == State::I)
-    {
+    case State::E:
+        return QColor(255, 200, 0);
+    case State::I:
         return Qt::red;
-    }
-    else if (cell.state == State::R)
-    {
-        return Qt::blue;
-    }
-    else
-    {
-        return Qt::green;
+    case State::R:
+        return QColor(0, 120, 215);
+    case State::D:
+        return Qt::darkGray;
+    default:
+        return Qt::black;
     }
 }
 
 void GridWidget::paintEvent(QPaintEvent*)
 {
-    QPainter p(this);
-    p.fillRect(rect(), Qt::black);
+    QPainter painter(this);
+    painter.fillRect(rect(), Qt::black);
 
-    if (m_usMap)
+    if (!m_usMap)
     {
-        m_usMap->drawBackground(p, rect());
-        const auto& prod = m_usMap->getProducts();
-        const float cw   = float(width()) / float(prod.cols);
-        const float ch   = float(height()) / float(prod.rows);
+        return;
+    }
 
-        if (m_sim)
+    if (m_sim)
+    {
+        drawCells(painter);
+    }
+
+    if (m_showGrid)
+    {
+        drawGrid(painter);
+    }
+}
+
+void GridWidget::drawCells(QPainter& painter) const
+{
+    const auto& products = m_usMap->getProducts();
+    if (products.cols <= 0 || products.rows <= 0)
+    {
+        return;
+    }
+
+    const float cellWidth  = static_cast<float>(width()) / static_cast<float>(products.cols);
+    const float cellHeight = static_cast<float>(height()) / static_cast<float>(products.rows);
+
+    for (int y = 0; y < products.rows; ++y)
+    {
+        for (int x = 0; x < products.cols; ++x)
         {
-            for (int y = 0; y < prod.rows; ++y)
+            const int index = y * products.cols + x;
+            if (!products.activeStates[static_cast<std::size_t>(index)])
             {
-                for (int x = 0; x < prod.cols; ++x)
-                {
-                    int i = y * prod.cols + x;
-                    if (!prod.activeStates[i])
-                        continue;
-
-                    const auto& cell = m_sim->cell(x, y);
-                    QColor      c    = getColorForCell(cell);
-                    p.fillRect(QRectF(x * cw, y * ch, cw, ch), c);
-                }
+                continue;
             }
 
-            if (!m_coloredStates.isEmpty())
-            {
-                for (int y = 0; y < prod.rows; ++y)
-                {
-                    for (int x = 0; x < prod.cols; ++x)
-                    {
-                        int i = y * prod.cols + x;
-                        if (!prod.activeStates[i])
-                            continue;
+            const auto& cell  = m_sim->cell(x, y);
+            QColor      color = getColorFor(cell);
+            QRectF      rectangleToDraw{x * cellWidth, y * cellHeight, cellWidth, cellHeight};
+            painter.fillRect(rectangleToDraw, color);
+        }
+    }
 
-                        int sid = prod.stateIds[i];
-                        if (m_coloredStates.contains(sid))
-                        {
-                            p.fillRect(QRectF(x * cw, y * ch, cw, ch), m_coloredStates[sid]);
-                        }
-                    }
+    if (!m_coloredStates.isEmpty())
+    {
+        for (int y = 0; y < products.rows; ++y)
+        {
+            for (int x = 0; x < products.cols; ++x)
+            {
+                const int index = y * products.cols + x;
+                if (!products.activeStates[static_cast<std::size_t>(index)])
+                {
+                    continue;
+                }
+
+                const int stateId = products.stateIds[static_cast<std::size_t>(index)];
+                if (m_coloredStates.contains(stateId))
+                {
+                    QRectF rectangleToDraw{x * cellWidth, y * cellHeight, cellWidth, cellHeight};
+                    painter.fillRect(rectangleToDraw, m_coloredStates.value(stateId));
                 }
             }
         }
+    }
+}
 
-        {
-            QPainter::RenderHints oldHints = p.renderHints();
-            p.setRenderHint(QPainter::Antialiasing, false);
-            p.setRenderHint(QPainter::SmoothPixmapTransform, false);
-            p.setRenderHints(oldHints);
-        }
+void GridWidget::drawGrid(QPainter& painter) const
+{
+    const auto& products = m_usMap->getProducts();
+    if (products.cols <= 0 || products.rows <= 0)
+    {
+        return;
+    }
+
+    const float cellWidth  = static_cast<float>(width()) / static_cast<float>(products.cols);
+    const float cellHeight = static_cast<float>(height()) / static_cast<float>(products.rows);
+
+    QPen pen(Qt::white);
+    pen.setColor(QColor(255, 255, 255, 40));
+    pen.setWidth(1);
+    pen.setCosmetic(true);
+    painter.setPen(pen);
+
+    for (int x = 1; x < products.cols; ++x)
+    {
+        qreal xpos = x * cellWidth;
+        painter.drawLine(QPointF{xpos, 0}, QPointF{xpos, qreal(height())});
+    }
+    for (int y = 1; y < products.rows; ++y)
+    {
+        qreal ypos = y * cellHeight;
+        painter.drawLine(QPointF{0, ypos}, QPointF{qreal(width()), ypos});
     }
 }
 
 void GridWidget::mousePressEvent(QMouseEvent* event)
 {
     if (!m_usMap)
+    {
         return;
+    }
 
     uint8_t sid = m_usMap->stateAtViewPos(event->pos(), size());
     if (sid == UsMap::kNoState)
+    {
         return;
+    }
 
-    int stateId = int(sid);
+    int          stateId = static_cast<int>(sid);
+    const QColor yellow(255, 230, 0, 110);
+    const QColor green(0, 255, 0, 110);
 
     if (event->button() == Qt::LeftButton)
     {
-        // Lewy klik – żółty
-        if (m_coloredStates.contains(stateId) &&
-            m_coloredStates[stateId] == QColor(255, 230, 0, 110))
-            m_coloredStates.remove(stateId); // ponowne kliknięcie usuwa kolor
+        if (m_coloredStates.contains(stateId) && m_coloredStates.value(stateId) == yellow)
+        {
+            m_coloredStates.remove(stateId);
+        }
         else
-            m_coloredStates[stateId] = QColor(255, 230, 0, 110);
+        {
+            m_coloredStates.insert(stateId, yellow);
+        }
     }
     else if (event->button() == Qt::RightButton)
     {
-        // Prawy klik – np. zielony
-        if (m_coloredStates.contains(stateId) && m_coloredStates[stateId] == QColor(0, 255, 0, 110))
+        if (m_coloredStates.contains(stateId) && m_coloredStates.value(stateId) == green)
+        {
             m_coloredStates.remove(stateId);
+        }
         else
-            m_coloredStates[stateId] = QColor(0, 255, 0, 110);
+        {
+            m_coloredStates.insert(stateId, green);
+        }
     }
 
-    m_selectedSingleStateId = sid;
+    m_selectedSingleStateId = stateId;
     const QString full      = m_usMap->getStateName(sid);
     const QString abbr      = QString::fromLatin1(UsMap::abbrevs()[sid]);
     const QString txt       = full.isEmpty() ? QStringLiteral("State: %1").arg(abbr)
                                              : QStringLiteral("State: %1 (%2)").arg(full, abbr);
     setToolTip(txt);
-    QToolTip::showText(event->globalPos(), txt, this, QRect(), 3000);
+    QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(), 3000);
     update();
 }
 
@@ -153,10 +207,12 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
     if (!m_usMap)
         return;
 
-    uint8_t sid      = m_usMap->stateAtViewPos(event->pos(), size());
-    int     newHover = (sid == UsMap::kNoState) ? -1 : int(sid);
+    const auto sid      = m_usMap->stateAtViewPos(event->pos(), size());
+    const int  newHover = (sid == UsMap::kNoState) ? -1 : int(sid);
     if (newHover == m_hoverSid)
-        return; // nic nowego
+    {
+        return;
+    }
 
     m_hoverSid = newHover;
 
@@ -165,7 +221,7 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
         const char*   abbr = UsMap::abbrevs()[sid];
         const QString txt  = QStringLiteral("State: %1").arg(abbr);
         setToolTip(txt);
-        QToolTip::showText(event->globalPos(), txt, this, QRect(), 3000);
+        QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(), 3000);
     }
     else
     {

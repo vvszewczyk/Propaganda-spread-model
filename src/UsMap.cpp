@@ -5,7 +5,6 @@
 #include <QFile>
 #include <QPainter>
 #include <QRegularExpression>
-#include <QStringView>
 #include <QtMath>
 #include <cstdint>
 
@@ -56,7 +55,10 @@ bool UsMap::buildProducts(QString* errorMessage)
     {
         const uchar* line = m_maskImage.constScanLine(y);
         for (int x = 0; x < cols; ++x)
-            m_outputProducts.activeStates[y * cols + x] = (line[x] > 0) ? 1 : 0;
+        {
+            m_outputProducts.activeStates[static_cast<std::size_t>(y * cols + x)] =
+                (line[x] > 0) ? 1 : 0;
+        }
     }
     if (m_debugEnabled)
     {
@@ -82,7 +84,7 @@ bool UsMap::buildProducts(QString* errorMessage)
 
     QImage oneState(cols, rows, QImage::Format_ARGB32_Premultiplied);
 
-    for (int sid = 0; sid < (int)m_stateIDs.size(); ++sid)
+    for (int sid = 0; sid < static_cast<int>(m_stateIDs.size()); ++sid)
     {
         const QString elemId = QString::fromLatin1(m_stateIDs[sid]);
         if (!m_svgRenderer.elementExists(elemId))
@@ -98,8 +100,11 @@ bool UsMap::buildProducts(QString* errorMessage)
             p.setCompositionMode(QPainter::CompositionMode_Source);
             m_svgRenderer.render(&p, elemId, QRectF(0, 0, cols, rows));
         }
+
         if (m_debugEnabled)
+        {
             debugSave(QString("state_%1.png").arg(elemId), oneState);
+        }
 
         QHash<QRgb, int> hist;
         int              totalAlphaPixels = 0;
@@ -134,7 +139,8 @@ bool UsMap::buildProducts(QString* errorMessage)
             }
         }
 
-        if (m_colorToState.contains(best) && m_colorToState.value(best) != uint8_t(sid))
+        if (m_colorToState.contains(best) &&
+            m_colorToState.value(best) != static_cast<uint8_t>(sid))
         {
             qWarning() << "[UsMap] COLOR CONFLICT"
                        << QString("#%1").arg((qRed(best) << 16) | (qGreen(best) << 8) | qBlue(best),
@@ -144,7 +150,7 @@ bool UsMap::buildProducts(QString* errorMessage)
         }
         else
         {
-            m_colorToState.insert(best, uint8_t(sid));
+            m_colorToState.insert(best, static_cast<uint8_t>(sid));
             if (m_debugEnabled)
             {
                 qDebug() << "[UsMap] color map (by render):" << elemId
@@ -165,17 +171,21 @@ bool UsMap::buildProducts(QString* errorMessage)
         for (int x = 0; x < cols; ++x)
         {
             const int i = y * cols + x;
-            if (!m_outputProducts.activeStates[i])
+            if (!m_outputProducts.activeStates[static_cast<std::size_t>(i)])
+            {
                 continue;
+            }
             if (qAlpha(cl[x]) == 0)
+            {
                 continue;
+            }
 
             const QRgb key = quant(cl[x]);
             auto       it  = m_colorToState.constFind(key);
             if (it != m_colorToState.constEnd())
             {
-                const uint8_t sid            = it.value();
-                m_outputProducts.stateIds[i] = sid;
+                const uint8_t sid                                      = it.value();
+                m_outputProducts.stateIds[static_cast<std::size_t>(i)] = sid;
                 m_statePixelCount[sid] += 1;
             }
         }
@@ -191,7 +201,9 @@ bool UsMap::loadSvgPatched(QString* errorMessage)
     if (!f.open(QIODevice::ReadOnly))
     {
         if (errorMessage)
+        {
             *errorMessage = "Cannot open " + m_svgFilePath;
+        }
         return false;
     }
     m_svgRaw = f.readAll();
@@ -222,11 +234,15 @@ bool UsMap::loadSvgPatched(QString* errorMessage)
 std::optional<QRgb> UsMap::parseHexColor(const QString& hex)
 {
     if (hex.size() != 7 || !hex.startsWith('#'))
+    {
         return std::nullopt;
+    }
     bool ok  = false;
     uint val = hex.mid(1).toUInt(&ok, 16);
     if (!ok)
+    {
         return std::nullopt;
+    }
     int r = (val >> 16) & 0xFF;
     int g = (val >> 8) & 0xFF;
     int b = (val) & 0xFF;
@@ -262,31 +278,31 @@ bool UsMap::buildColorMapFromSvg()
         const QString tag = svg.mid(tagStart, tagEnd - tagStart);
 
         {
-            QRegularExpression      reName(QStringLiteral("data-name\\s*=\\s*\"([^\"]*)\""),
-                                           QRegularExpression::CaseInsensitiveOption);
-            QRegularExpressionMatch mName = reName.match(tag);
+            QRegularExpression reName(QStringLiteral("data-name\\s*=\\s*\"([^\"]*)\""),
+                                      QRegularExpression::CaseInsensitiveOption);
+            auto               mName = reName.match(tag);
             if (mName.hasMatch())
             {
                 m_stateNames[stateId] = mName.captured(1).trimmed();
             }
         }
 
-        QRegularExpression      reFill("fill\\s*=\\s*\"(#[0-9a-fA-F]{6})\"");
-        QRegularExpressionMatch mf = reFill.match(tag);
-        QString                 hex;
+        QRegularExpression reFill("fill\\s*=\\s*\"(#[0-9a-fA-F]{6})\"");
+        auto               mf = reFill.match(tag);
+        QString            hex;
         if (mf.hasMatch())
         {
             hex = mf.captured(1);
         }
         else
         {
-            QRegularExpression      reStyle("style\\s*=\\s*\"([^\"]*)\"");
-            QRegularExpressionMatch ms = reStyle.match(tag);
+            QRegularExpression reStyle("style\\s*=\\s*\"([^\"]*)\"");
+            auto               ms = reStyle.match(tag);
             if (ms.hasMatch())
             {
-                const QString           style = ms.captured(1);
-                QRegularExpression      reFillInStyle(";?\\s*fill\\s*:\\s*(#[0-9a-fA-F]{6})");
-                QRegularExpressionMatch mf2 = reFillInStyle.match(style);
+                const QString      style = ms.captured(1);
+                QRegularExpression reFillInStyle(";?\\s*fill\\s*:\\s*(#[0-9a-fA-F]{6})");
+                auto               mf2 = reFillInStyle.match(style);
                 if (mf2.hasMatch())
                     hex = mf2.captured(1);
             }
@@ -306,20 +322,6 @@ bool UsMap::buildColorMapFromSvg()
         else
         {
             qWarning() << "[UsMap] bad color for id:" << id << hex;
-        }
-    }
-
-    QHash<QRgb, QVector<QString>> colorToIds;
-    for (auto it = colorToIds.constBegin(); it != colorToIds.constEnd(); ++it)
-    {
-        if (it.value().size() > 1)
-        {
-            qWarning().noquote() << "[UsMap] DUP color"
-                                 << QString("#%1").arg((qRed(it.key()) << 16) |
-                                                           (qGreen(it.key()) << 8) |
-                                                           qBlue(it.key()),
-                                                       6, 16, QChar('0'))
-                                 << "for states:" << it.value().join(',');
         }
     }
 
@@ -351,19 +353,14 @@ uint8_t UsMap::stateAtViewPos(QPointF position, QSize viewSize) const
     }
     const auto sx = static_cast<qreal>(m_outputProducts.cols) / viewSize.width();
     const auto sy = static_cast<qreal>(m_outputProducts.rows) / viewSize.height();
-    int        x  = static_cast<int>(position.x() * sx);
-    int        y  = static_cast<int>(position.y() * sy);
+    const int  x  = static_cast<int>(position.x() * sx);
+    const int  y  = static_cast<int>(position.y() * sy);
 
     if (x < 0 || y < 0 || x >= m_outputProducts.cols || y >= m_outputProducts.rows)
     {
         return kNoState;
     }
     return m_outputProducts.stateIds[static_cast<std::size_t>(y * m_outputProducts.cols + x)];
-}
-
-QRectF UsMap::svgViewBox() const
-{
-    return m_svgRenderer.viewBoxF();
 }
 
 UsMap::Products& UsMap::getProducts() const
@@ -379,7 +376,7 @@ std::span<const char* const> UsMap::abbrevs()
 void UsMap::setDebug(bool on, QString dumpDir)
 {
     m_debugEnabled = on;
-    m_debugDir     = dumpDir.isEmpty() ? QDir::tempPath() + "/usmap_debug" : dumpDir;
+    m_debugDir     = dumpDir.isEmpty() ? QDir::tempPath() + "/usmap_debug" : std::move(dumpDir);
     if (m_debugEnabled)
     {
         QDir().mkpath(m_debugDir);
@@ -395,7 +392,9 @@ void UsMap::setDebugColorizeStates(bool on)
 void UsMap::debugSave(const QString& name, const QImage& img) const
 {
     if (!m_debugEnabled)
+    {
         return;
+    }
     const QString path = m_debugDir + "/" + name;
     img.save(path);
     qDebug() << "[UsMap] saved" << path;
