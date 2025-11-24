@@ -1,62 +1,77 @@
 #pragma once
+#include "Constants.hpp"
 #include "GridWidget.hpp"
 #include "Simulation.hpp"
 #include "UsMap.hpp"
 
-#include <QCheckBox>
-#include <QComboBox>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QMainWindow>
-#include <QPushButton>
-#include <QStackedWidget>
+#include <QDebug>
+#include <QStringLiteral>
+#include <QStringView>
 #include <QTimer>
-#include <QVBoxLayout>
+#include <QtWidgets>
+#include <cstddef>
+#include <memory>
+#include <type_traits>
 // #include <QtCharts>
 // #include <QtWidgets/QMainWindow>
-#include <memory>
 
-class MainWindow : public QMainWindow
+namespace app::ui
 {
-        Q_OBJECT
-    public:
-        MainWindow(QWidget* parent = nullptr);
-        ~MainWindow() override;
-        MainWindow(const MainWindow&)            = delete;
-        MainWindow& operator=(const MainWindow&) = delete;
-        MainWindow(MainWindow&&)                 = delete;
-        MainWindow& operator=(MainWindow&&)      = delete;
+    template <typename T, typename Parent, typename Fn = std::nullptr_t, typename... Args>
+    T* makeWidget(Parent* parent, Fn fn, Args&&... ctorArgs)
+    {
+        static_assert(std::is_base_of_v<QObject, T>, "T must derive from QObject / QWidget");
+        auto* widget = new T(std::forward<Args>(ctorArgs)..., parent);
 
-    private:
-        QStackedWidget*          contentStack;
-        GridWidget*              gridWidget;
-        std::unique_ptr<QWidget> m_statsWidget;
+        if constexpr (std::is_invocable_v<Fn, T*>)
+        {
+            std::forward<Fn>(fn)(widget);
+        }
 
-        std::unique_ptr<UsMap>      m_usMap;
-        std::unique_ptr<Simulation> m_simulation;
-        std::unique_ptr<QTimer>     m_timer;
+        return widget;
+    }
 
-        QLabel*      simulationLabel;
-        QLabel*      iterationLabel;
-        QLabel*      neighbourhoodLabel;
-        QPushButton* startButton;
-        QPushButton* resetButton;
-        QPushButton* toggleViewButton;
-        QCheckBox*   gridToggle;
-        QComboBox*   neighbourhoodCombo;
+    class MainWindow : public QMainWindow
+    {
+            Q_OBJECT
+        public:
+            MainWindow(QWidget* parent = nullptr);
+            ~MainWindow() override;
+            MainWindow(const MainWindow&)            = delete;
+            MainWindow& operator=(const MainWindow&) = delete;
+            MainWindow(MainWindow&&)                 = delete;
+            MainWindow& operator=(MainWindow&&)      = delete;
 
-        void setupUI();
-        void setupLayout();
-        void setupConnections();
-        void updateIterationLabel(int globalStep);
-        void setupStats();
-        void updateStats(int globalStep);
-        void clearStats();
+        private:
+            std::unique_ptr<UsMap>      usMap_;
+            std::unique_ptr<Simulation> simulation_;
+            std::unique_ptr<QTimer>     timer_;
 
-    private slots:
-        void onStartButtonClicked();
-        void onResetButtonClicked();
-        void onStep();
-        void onNeighbourhoodChanged(int index);
-        void onToggleView(bool checked);
-};
+            QStackedWidget* contentStack_{nullptr};
+            GridWidget*     gridWidget_{nullptr};
+            QWidget*        statsWidget_{nullptr};
+
+            QLabel*      simulationLabel_{nullptr};
+            QLabel*      iterationLabel_{nullptr};
+            QLabel*      neighbourhoodLabel_{nullptr};
+            QPushButton* startButton_{nullptr};
+            QPushButton* resetButton_{nullptr};
+            QPushButton* toggleViewButton_{nullptr};
+            QCheckBox*   gridToggle_{nullptr};
+            QComboBox*   neighbourhoodCombo_{nullptr};
+
+            void buildUi();
+            void buildLayout();
+            void wire();
+            void setupStats();
+            void updateStats(int globalStep);
+            void clearStats();
+
+        private slots:
+            void onStep();
+            void onStartButtonClicked();
+            void onResetButtonClicked();
+            void onToggleView(bool checked);
+            void onNeighbourhoodChanged(int index);
+    };
+} // namespace app::ui

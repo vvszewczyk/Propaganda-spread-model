@@ -1,60 +1,56 @@
 #include "MainWindow.hpp"
 
-#include "Constants.hpp"
-
-#include <QDebug>
-#include <QWidget>
-#include <memory>
+using namespace app::ui;
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
-      contentStack(new QStackedWidget(centralWidget())),
-      gridWidget(new GridWidget(this)),
-      m_statsWidget(std::make_unique<QWidget>(this)),
-      m_usMap(std::make_unique<UsMap>(
-          "Propaganda-spread-model/map/us_test.svg", Config::gridCols, Config::gridRows)),
-      m_simulation(std::make_unique<Simulation>(Config::gridCols, Config::gridRows)),
-      m_timer(std::make_unique<QTimer>(this)),
-      simulationLabel(new QLabel("Simulation settings", this)),
-      iterationLabel(new QLabel("Iteration: 0", this)),
-      neighbourhoodLabel(new QLabel("Neighbourhood", this)),
-      startButton(new QPushButton("Start", this)),
-      resetButton(new QPushButton("Reset", this)),
-      toggleViewButton(new QPushButton("Show stats", this)),
-      gridToggle(new QCheckBox("Show grid", this)),
-      neighbourhoodCombo(new QComboBox(this))
+      usMap_(std::make_unique<UsMap>(QStringLiteral("Propaganda-spread-model/map/us_test.svg"),
+                                     Config::gridCols,
+                                     Config::gridRows)),
+      simulation_(std::make_unique<Simulation>(Config::gridCols, Config::gridRows)),
+      timer_(std::make_unique<QTimer>(this))
 {
     setFixedSize(Config::windowWidth, Config::windowHeight);
-    setupUI();
-    setupStats();
-    setupLayout();
-    setupConnections();
+    buildUi();
+    buildLayout();
+    wire();
 }
 
-void MainWindow::setupUI()
+MainWindow::~MainWindow() = default;
+
+void MainWindow::buildUi()
 {
-    this->gridWidget->setFixedSize(Config::gridPixelWidth, Config::gridPixelHeight);
-    this->gridWidget->setSimulation(m_simulation.get());
+    contentStack_ = new QStackedWidget(this);
+    gridWidget_   = new GridWidget(this);
+    statsWidget_  = new QWidget(this);
 
-    m_usMap->setDebug(false, "../../../usmap_debug");
-    m_usMap->setDebugColorizeStates(false);
-    QString errorMessage;
-    if (!m_usMap->buildProducts(&errorMessage))
+    gridWidget_->setFixedSize(Config::gridPixelWidth, Config::gridPixelHeight);
+    gridWidget_->setSimulation(simulation_.get());
+
+    QString error;
+    if (!usMap_->buildProducts(&error))
     {
-        qWarning() << "Failed to build US map products:" << errorMessage;
+        qWarning() << "Failed to build map: " << error;
     }
-    this->gridWidget->setUsMap(m_usMap.get());
-    this->gridToggle->setChecked(true);
+    gridWidget_->setUsMap(usMap_.get());
 
-    neighbourhoodCombo->addItem("Von Neumann");
-    neighbourhoodCombo->addItem("Moore");
-    neighbourhoodCombo->setCurrentIndex(0);
+    simulationLabel_    = makeWidget<QLabel>(this, nullptr, QStringLiteral("Simulation settings"));
+    iterationLabel_     = makeWidget<QLabel>(this, nullptr, QStringLiteral("Iteration: 0"));
+    neighbourhoodLabel_ = makeWidget<QLabel>(this, nullptr, QStringLiteral("Neighbourhood"));
 
-    toggleViewButton->setCheckable(true);
-    toggleViewButton->setChecked(false);
+    startButton_      = makeWidget<QPushButton>(this, nullptr, QStringLiteral("Start"));
+    resetButton_      = makeWidget<QPushButton>(this, nullptr, QStringLiteral("Reset"));
+    toggleViewButton_ = makeWidget<QPushButton>(
+        this, [](auto* b) { b->setCheckable(true); }, QStringLiteral("Show stats"));
+
+    gridToggle_ = makeWidget<QCheckBox>(
+        this, [](auto* c) { c->setChecked(true); }, QStringLiteral("Show grid"));
+    neighbourhoodCombo_ = makeWidget<QComboBox>(
+        this,
+        [](auto* c) { c->addItems({QStringLiteral("Von Neumann"), QStringLiteral("Moore")}); });
 }
 
-void MainWindow::setupLayout()
+void MainWindow::buildLayout()
 {
     auto* centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
@@ -66,142 +62,112 @@ void MainWindow::setupLayout()
     auto* left = new QWidget(centralWidget);
     left->setStyleSheet(Config::leftBlockColor);
     auto* leftLayout = new QVBoxLayout(left);
-
-    contentStack->addWidget(gridWidget);
-    contentStack->addWidget(m_statsWidget.get());
-    contentStack->setCurrentIndex(0);
-
-    leftLayout->addWidget(contentStack, 1);
+    contentStack_->addWidget(gridWidget_);
+    contentStack_->addWidget(statsWidget_);
+    contentStack_->setCurrentIndex(0);
+    leftLayout->addWidget(contentStack_, 1);
     leftLayout->addStretch();
     mainLayout->addWidget(left, 7);
 
     auto* right = new QWidget(centralWidget);
     // right->setStyleSheet(Config::rightBlockColor);
     auto* rightLayout = new QVBoxLayout(right);
-
-    rightLayout->addWidget(simulationLabel);
+    rightLayout->addWidget(simulationLabel_);
 
     // Start/pause and reset buttons
-    auto* btnRow = new QHBoxLayout();
-    btnRow->addStretch();
-    btnRow->addWidget(startButton);
-    btnRow->addSpacing(5); // Space between buttons
-    btnRow->addWidget(resetButton);
-    btnRow->addStretch();
-    rightLayout->addLayout(btnRow);
+    auto* rowButtons = new QHBoxLayout();
+    rowButtons->addStretch();
+    rowButtons->addWidget(startButton_);
+    rowButtons->addSpacing(6); // Space between buttons
+    rowButtons->addWidget(resetButton_);
+    rowButtons->addStretch();
+    rightLayout->addLayout(rowButtons);
 
     // Neighbourhood combobox
-    rightLayout->addWidget(neighbourhoodLabel);
-    rightLayout->addWidget(neighbourhoodCombo);
+    rightLayout->addWidget(neighbourhoodLabel_);
+    rightLayout->addWidget(neighbourhoodCombo_);
 
     // Checkboxes
-    auto* checkboxRow = new QHBoxLayout();
-    checkboxRow->addStretch();
-    checkboxRow->addWidget(gridToggle);
-    checkboxRow->addStretch(); // Push checkbox up
-    rightLayout->addLayout(checkboxRow);
+    auto* rowChecks = new QHBoxLayout();
+    rowChecks->addStretch();
+    rowChecks->addWidget(gridToggle_);
+    rowChecks->addStretch(); // Push checkbox up
+    rightLayout->addLayout(rowChecks);
 
     rightLayout->addStretch();
 
     // Grid/stats button
-    rightLayout->addWidget(toggleViewButton, 0, Qt::AlignCenter);
+    rightLayout->addWidget(toggleViewButton_, 0, Qt::AlignCenter);
 
     // Iterations label
-    rightLayout->addWidget(iterationLabel, 0, Qt::AlignRight);
+    rightLayout->addWidget(iterationLabel_, 0, Qt::AlignRight);
 
     // Add right panel to main layout
     mainLayout->addWidget(right, 1);
 }
 
-void MainWindow::setupStats()
+void MainWindow::wire()
 {
+    connect(startButton_, SIGNAL(clicked()), this, SLOT(onStartButtonClicked()));
+    connect(resetButton_, SIGNAL(clicked()), this, SLOT(onResetButtonClicked()));
+    connect(gridToggle_, &QCheckBox::toggled, gridWidget_, &GridWidget::setShowGrid);
+    connect(toggleViewButton_, SIGNAL(toggled(bool)), this, SLOT(onToggleView(bool)));
+    connect(timer_.get(), SIGNAL(timeout()), this, SLOT(onStep()));
+    connect(neighbourhoodCombo_, SIGNAL(currentIndexChanged(int)), this,
+            SLOT(onNeighbourhoodChanged(int)));
 }
 
-void MainWindow::setupConnections()
+void MainWindow::onStep()
 {
-    connect(startButton, SIGNAL(clicked()), this,
-            SLOT(onStartButtonClicked())); // Start button event
-    connect(resetButton, SIGNAL(clicked()), this,
-            SLOT(onResetButtonClicked())); // Reset button event
-    connect(gridToggle, &QCheckBox::toggled, gridWidget, &GridWidget::setShowGrid);
-    connect(toggleViewButton, SIGNAL(toggled(bool)), this,
-            SLOT(onToggleView(bool)));                               // Toggle view button
-    connect(m_timer.get(), SIGNAL(timeout()), this, SLOT(onStep())); // Timer timeout
-    connect(neighbourhoodCombo, SIGNAL(currentIndexChanged(int)), this,
-            SLOT(onNeighbourhoodChanged(int))); // Neighbourhood combobox
-}
+    simulation_->step();
+    gridWidget_->update();
 
-// Widget methods
+    if (contentStack_->currentIndex() == 1)
+    {
+        // updateStats(globalStep);
+    }
+}
 
 void MainWindow::onStartButtonClicked()
 {
-    if (m_timer->isActive())
+    if (timer_->isActive())
     {
-        m_timer->stop();
-        startButton->setText("Start");
+        timer_->stop();
+        startButton_->setText(QStringLiteral("Start"));
     }
     else
     {
-        m_timer->start(100);
-        startButton->setText("Pause");
+        timer_->start(100);
+        startButton_->setText(QStringLiteral("Pause"));
     }
 }
 
 void MainWindow::onResetButtonClicked()
 {
-    m_timer->stop();
-    startButton->setText("Start");
-    m_simulation->reset();
-    gridWidget->update();
+    timer_->stop();
+    startButton_->setText(QStringLiteral("Start"));
+    simulation_->reset();
+    gridWidget_->update();
     clearStats();
-    updateIterationLabel(0);
-}
-
-void MainWindow::onStep()
-{
-    // CA
-    m_simulation->step();
-    gridWidget->update();
-
-    if (contentStack->currentIndex() == 1)
-    {
-        // updateStats(globalStep);
-    }
-}
-
-void MainWindow::updateIterationLabel(int globalStep)
-{
-    iterationLabel->setText(QString("Iteration: %1").arg(globalStep));
-}
-
-void MainWindow::onNeighbourhoodChanged(int index)
-{
-    auto chosenNeighbourhoodType = NeighbourhoodType::VON_NEUMANN;
-
-    if (index == 0)
-    {
-        chosenNeighbourhoodType = NeighbourhoodType::VON_NEUMANN;
-    }
-    else if (index == 1)
-    {
-        chosenNeighbourhoodType = NeighbourhoodType::MOORE;
-    }
-    m_simulation->setNeighbourhoodType(chosenNeighbourhoodType);
+    iterationLabel_->setText(QStringLiteral("Iteration: 0"));
 }
 
 void MainWindow::onToggleView(bool checked)
 {
-    if (checked)
-    {
-        contentStack->setCurrentIndex(1);
-        toggleViewButton->setText(QStringLiteral("Show simulation"));
-        // updateStats(globalStep);
-    }
-    else
-    {
-        contentStack->setCurrentIndex(0);
-        toggleViewButton->setText(QStringLiteral("Show stats"));
-    }
+    contentStack_->setCurrentIndex(checked ? 1 : 0);
+    toggleViewButton_->setText(checked ? QStringLiteral("Show simulation")
+                                       : QStringLiteral("Show stats"));
+}
+
+void MainWindow::onNeighbourhoodChanged(int index)
+{
+    auto chosenNeighbourhoodType =
+        (index == 0) ? NeighbourhoodType::MOORE : NeighbourhoodType::VON_NEUMANN;
+    simulation_->setNeighbourhoodType(chosenNeighbourhoodType);
+}
+
+void MainWindow::setupStats()
+{
 }
 
 void MainWindow::updateStats(int globalStep)
@@ -211,5 +177,3 @@ void MainWindow::updateStats(int globalStep)
 void MainWindow::clearStats()
 {
 }
-
-MainWindow::~MainWindow() = default;

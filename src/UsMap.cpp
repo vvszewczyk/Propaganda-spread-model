@@ -5,14 +5,12 @@
 #include <QFile>
 #include <QPainter>
 #include <QRegularExpression>
+#include <QXmlStreamReader>
 #include <QtMath>
 #include <cstdint>
-
-const std::array<const char* const, 51> UsMap::m_stateIDs = {
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL",
-    "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT",
-    "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
-    "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC"};
+#include <qglobal.h>
+#include <qstringliteral.h>
+#include <qstringview.h>
 
 UsMap::UsMap(QString svgFilePath, int cols, int rows)
     : m_svgFilePath(std::move(svgFilePath)), m_outputProducts({{}, {}, cols, rows})
@@ -21,13 +19,7 @@ UsMap::UsMap(QString svgFilePath, int cols, int rows)
         static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows), 0);
     m_outputProducts.stateIds.resize(
         static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows), kNoState);
-    m_statePixelCount.assign(m_stateIDs.size(), 0);
-
-    m_stateNames.resize(m_stateIDs.size());
-    for (std::size_t i = 0; i < m_stateIDs.size(); ++i)
-    {
-        m_stateNames[i] = QString::fromLatin1(m_stateIDs[i]);
-    }
+    m_statePixelCount.clear();
 }
 
 bool UsMap::buildProducts(QString* errorMessage)
@@ -39,8 +31,13 @@ bool UsMap::buildProducts(QString* errorMessage)
         return false;
     }
 
+    if (!scanStatesFromSvg())
+    {
+        qWarning() << "[UsMap] No states parsed from SVG.";
+    }
+
     const int cols = m_outputProducts.cols, rows = m_outputProducts.rows;
-    std::fill(m_statePixelCount.begin(), m_statePixelCount.end(), 0);
+    m_statePixelCount.assign(m_states.size(), 0);
     std::fill(m_outputProducts.stateIds.begin(), m_outputProducts.stateIds.end(), kNoState);
 
     m_maskImage = QImage(cols, rows, QImage::Format_Grayscale8);
@@ -84,9 +81,9 @@ bool UsMap::buildProducts(QString* errorMessage)
 
     QImage oneState(cols, rows, QImage::Format_ARGB32_Premultiplied);
 
-    for (int sid = 0; sid < static_cast<int>(m_stateIDs.size()); ++sid)
+    for (int sid = 0; sid < static_cast<int>(m_states.size()); ++sid)
     {
-        const QString elemId = QString::fromLatin1(m_stateIDs[sid]);
+        const QString elemId = m_states[static_cast<std::size_t>(sid)].id;
         if (!m_svgRenderer.elementExists(elemId))
         {
             qWarning() << "[UsMap] Missing element:" << elemId;
@@ -142,11 +139,13 @@ bool UsMap::buildProducts(QString* errorMessage)
         if (m_colorToState.contains(best) &&
             m_colorToState.value(best) != static_cast<uint8_t>(sid))
         {
+            const uint8_t otherSid = m_colorToState.value(best);
+            const QString otherId =
+                (otherSid < m_states.size()) ? m_states[otherSid].id : QStringLiteral("?");
             qWarning() << "[UsMap] COLOR CONFLICT"
                        << QString("#%1").arg((qRed(best) << 16) | (qGreen(best) << 8) | qBlue(best),
                                              6, 16, QChar('0'))
-                       << "between" << m_stateIDs[m_colorToState.value(best)] << "and" << elemId
-                       << "(ensure unique fills in SVG)";
+                       << "between" << otherId << "and" << elemId << "(ensure unique fills in SVG)";
         }
         else
         {
@@ -195,45 +194,79 @@ bool UsMap::buildProducts(QString* errorMessage)
     return true;
 }
 
-bool UsMap::loadSvgPatched(QString* errorMessage)
+void UsMap::setError(QString* errorMessage, const QString& message) const
 {
-    QFile f(m_svgFilePath);
-    if (!f.open(QIODevice::ReadOnly))
+    if (errorMessage)
     {
-        if (errorMessage)
-        {
-            *errorMessage = "Cannot open " + m_svgFilePath;
-        }
+        *errorMessage = message;
+    }
+}
+
+bool UsMap::readSvgFile(QString* errorMessage)
+{
+    QFile mapFile(m_svgFilePath);
+
+    if (!mapFile.open(QIODevice::ReadOnly))
+    {
+        setError(errorMessage, "Cannot open " + m_svgFilePath);
         return false;
     }
-    m_svgRaw = f.readAll();
-    f.close();
 
-    m_svgRaw.replace("stroke:#000000", "stroke:none");
-    m_svgRaw.replace("stroke:#000", "stroke:none");
-    m_svgRaw.replace("stroke:black", "stroke:none");
+    m_svgRaw = mapFile.readAll();
+    return true;
+}
 
+void UsMap::patchSvgContent()
+{
+    constexpr const char* strokes[] = {
+        "stroke:#000000",
+        "stroke:#000",
+        "stroke:black",
+    };
+
+    for (const auto& stroke : strokes)
+    {
+        m_svgRaw.replace(stroke, "stroke:none");
+    }
+}
+
+bool UsMap::loadSvgIntoRenderer(QString* errorMessage)
+{
     if (!m_svgRenderer.load(m_svgRaw))
     {
-        if (errorMessage)
-            *errorMessage = "QSvgRenderer: failed to load patched svg";
+        setError(errorMessage, "QSvgRenderer: failed to load patched svg");
         return false;
     }
 
-    if (!buildColorMapFromSvg())
-    {
-        if (errorMessage)
-        {
-            *errorMessage = "Failed to extract fill colors from SVG";
-        }
-        qWarning() << "[UsMap] No color->state map built. Will not assign by color.";
-    }
     return true;
+}
+
+bool UsMap::loadSvgPatched(QString* errorMessage)
+{
+    if (!readSvgFile(errorMessage))
+    {
+        return false;
+    }
+
+    patchSvgContent();
+
+    if (!loadSvgIntoRenderer(errorMessage))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool UsMap::isValidHexColor(const QString& hex)
+{
+    const QRegularExpression regex("^#[0-9A-Fa-f]{6}$");
+    return regex.match(hex).hasMatch();
 }
 
 std::optional<QRgb> UsMap::parseHexColor(const QString& hex)
 {
-    if (hex.size() != 7 || !hex.startsWith('#'))
+    if (!isValidHexColor(hex))
     {
         return std::nullopt;
     }
@@ -243,89 +276,108 @@ std::optional<QRgb> UsMap::parseHexColor(const QString& hex)
     {
         return std::nullopt;
     }
+
     int r = (val >> 16) & 0xFF;
     int g = (val >> 8) & 0xFF;
     int b = (val) & 0xFF;
     return qRgb(r, g, b);
 }
 
-bool UsMap::buildColorMapFromSvg()
+void UsMap::resetStates()
 {
-    m_colorToState.clear();
-    const QString svg = QString::fromUtf8(m_svgRaw);
+    m_states.clear();
+    m_stateIdToIndex.clear();
+}
 
-    for (std::size_t stateId = 0; stateId < m_stateIDs.size(); ++stateId)
+bool UsMap::isStateElement(const QString& tag) const
+{
+    static constexpr const char* tags[] = {"path", "polygon", "rect", "g"};
+
+    for (const char* t : tags)
     {
-        const QString id = QString::fromLatin1(m_stateIDs[stateId]);
+        if (tag.compare(QLatin1StringView(t), Qt::CaseInsensitive) == 0)
+            return true;
+    }
+    return false;
+}
 
-        QRegularExpression reTag(
-            QStringLiteral(R"(id\s*=\s*"%1"[^>]*>)").arg(QRegularExpression::escape(id)),
-            QRegularExpression::DotMatchesEverythingOption |
-                QRegularExpression::CaseInsensitiveOption);
-        QRegularExpressionMatch m = reTag.match(svg);
-        if (!m.hasMatch())
-        {
-            qWarning() << "[UsMap] id not found in SVG:" << id;
-            continue;
-        }
-        const qsizetype tagEnd   = m.capturedEnd();
-        qsizetype       tagStart = svg.lastIndexOf('<', m.capturedStart());
-        if (tagStart < 0 || tagEnd <= tagStart)
-        {
-            qWarning() << "[UsMap] malformed tag for id:" << id;
-            continue;
-        }
-        const QString tag = svg.mid(tagStart, tagEnd - tagStart);
-
-        {
-            QRegularExpression reName(QStringLiteral("data-name\\s*=\\s*\"([^\"]*)\""),
-                                      QRegularExpression::CaseInsensitiveOption);
-            auto               mName = reName.match(tag);
-            if (mName.hasMatch())
-            {
-                m_stateNames[stateId] = mName.captured(1).trimmed();
-            }
-        }
-
-        QRegularExpression reFill("fill\\s*=\\s*\"(#[0-9a-fA-F]{6})\"");
-        auto               mf = reFill.match(tag);
-        QString            hex;
-        if (mf.hasMatch())
-        {
-            hex = mf.captured(1);
-        }
-        else
-        {
-            QRegularExpression reStyle("style\\s*=\\s*\"([^\"]*)\"");
-            auto               ms = reStyle.match(tag);
-            if (ms.hasMatch())
-            {
-                const QString      style = ms.captured(1);
-                QRegularExpression reFillInStyle(";?\\s*fill\\s*:\\s*(#[0-9a-fA-F]{6})");
-                auto               mf2 = reFillInStyle.match(style);
-                if (mf2.hasMatch())
-                    hex = mf2.captured(1);
-            }
-        }
-
-        if (hex.isEmpty())
-        {
-            qWarning() << "[UsMap] fill not found for id:" << id;
-            continue;
-        }
-        if (auto rgb = parseHexColor(hex))
-        {
-            const QRgb key = *rgb;
-            m_colorToState.insert(key, static_cast<uint8_t>(stateId));
-            qDebug() << "[UsMap] color map:" << id << hex;
-        }
-        else
-        {
-            qWarning() << "[UsMap] bad color for id:" << id << hex;
-        }
+QString UsMap::extractFill(const QXmlStreamAttributes& attrs) const
+{
+    if (const auto fill = attrs.value("fill"); !fill.isEmpty())
+    {
+        return fill.toString().trimmed();
     }
 
-    return !m_colorToState.isEmpty();
+    if (const auto style = attrs.value("style"); !style.isEmpty())
+    {
+        for (const auto& kv : style.toString().split(';', Qt::SkipEmptyParts))
+        {
+            const int pos = kv.indexOf(':');
+            if (pos > 0 && kv.left(pos).trimmed().compare("fill", Qt::CaseInsensitive) == 0)
+                return kv.mid(pos + 1).trimmed();
+        }
+    }
+    return {};
+}
+
+void UsMap::processStateElement(const QXmlStreamAttributes& attrs)
+{
+    State state;
+    state.id = attrs.value("id").toString().trimmed();
+    if (state.id.isEmpty())
+        return;
+
+    state.name = attrs.value("data-name").toString().trimmed();
+
+    if (auto rgb = parseHexColor(extractFill(attrs)))
+        state.fill = *rgb;
+
+    insertOrUpdateState(std::move(state));
+}
+
+void UsMap::insertOrUpdateState(State&& st)
+{
+    if (m_stateIdToIndex.contains(st.id))
+    {
+        int idx = m_stateIdToIndex.value(st.id);
+        if (m_states[idx].name.isEmpty() && !st.name.isEmpty())
+            m_states[idx].name = st.name;
+        return;
+    }
+
+    int idx = static_cast<int>(m_states.size());
+    m_stateIdToIndex.insert(st.id, idx);
+    m_states.push_back(std::move(st));
+}
+
+void UsMap::reportXmlError(const QXmlStreamReader& xml) const
+{
+    if (xml.hasError())
+        qWarning() << "[UsMap] XML parse error:" << xml.errorString();
+}
+
+bool UsMap::scanStatesFromSvg()
+{
+    resetStates();
+
+    QXmlStreamReader xml(m_svgRaw);
+
+    while (!xml.atEnd())
+    {
+        xml.readNext();
+
+        if (!xml.isStartElement())
+            continue;
+
+        const QString tagName = xml.name().toString();
+        if (!isStateElement(tagName))
+            continue;
+
+        processStateElement(xml.attributes());
+    }
+
+    reportXmlError(xml);
+    return !m_states.empty();
 }
 
 void UsMap::drawBackground(QPainter& painter, const QRect& rect) const
@@ -368,11 +420,6 @@ UsMap::Products& UsMap::getProducts() const
     return const_cast<UsMap::Products&>(m_outputProducts);
 }
 
-std::span<const char* const> UsMap::abbrevs()
-{
-    return std::span<const char* const>(m_stateIDs.data(), m_stateIDs.size());
-}
-
 void UsMap::setDebug(bool on, QString dumpDir)
 {
     m_debugEnabled = on;
@@ -402,13 +449,28 @@ void UsMap::debugSave(const QString& name, const QImage& img) const
 
 QString UsMap::getStateName(uint8_t stateId) const
 {
-    if (stateId == kNoState)
+    if (stateId == kNoState || stateId >= m_states.size())
     {
         return {};
     }
-    if (stateId >= m_stateNames.size())
+    const auto& st = m_states[stateId];
+    return st.name.isEmpty() ? st.id : st.name;
+}
+
+QString UsMap::getStateId(uint8_t stateId) const
+{
+    if (stateId == kNoState || stateId >= m_states.size())
     {
         return {};
     }
-    return m_stateNames[stateId];
+    return m_states[stateId].id;
+}
+
+std::optional<int> UsMap::indexOfAbbrev(QStringView abbrev) const
+{
+    const QString key = abbrev.toString().trimmed().toUpper();
+    const auto    it  = m_stateIdToIndex.constFind(key);
+    if (it == m_stateIdToIndex.constEnd())
+        return std::nullopt;
+    return it.value();
 }

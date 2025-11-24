@@ -194,9 +194,10 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
 
     m_selectedSingleStateId = stateId;
     const QString full      = m_usMap->getStateName(sid);
-    const QString abbr      = QString::fromLatin1(UsMap::abbrevs()[sid]);
-    const QString txt       = full.isEmpty() ? QStringLiteral("State: %1").arg(abbr)
-                                             : QStringLiteral("State: %1 (%2)").arg(full, abbr);
+    const QString abbr      = m_usMap->getStateId(sid);
+    const QString txt =
+        full.compare(abbr, Qt::CaseInsensitive) == 0 ? abbr : QString("%1 (%2)").arg(full, abbr);
+
     setToolTip(txt);
     QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(), 3000);
     update();
@@ -218,8 +219,8 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
 
     if (sid != UsMap::kNoState)
     {
-        const char*   abbr = UsMap::abbrevs()[sid];
-        const QString txt  = QStringLiteral("State: %1").arg(abbr);
+        const QString stateId = m_usMap->getStateId(sid);
+        const QString txt     = QStringLiteral("State: %1").arg(stateId);
         setToolTip(txt);
         QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(), 3000);
     }
@@ -231,7 +232,7 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
 
 void GridWidget::leaveEvent(QEvent* event)
 {
-    Q_UNUSED(event);
+    Q_UNUSED(event)
     m_hoverSid = -1;
     QToolTip::hideText();
 }
