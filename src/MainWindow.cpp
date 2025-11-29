@@ -28,7 +28,7 @@ void MainWindow::buildUi()
     gridWidget_->setSimulation(simulation_.get());
 
     QString error;
-    if (!usMap_->buildProducts(&error))
+    if (!usMap_->buildStateProducts(&error))
     {
         qWarning() << "Failed to build map: " << error;
     }
@@ -44,7 +44,7 @@ void MainWindow::buildUi()
         this, [](auto* b) { b->setCheckable(true); }, QStringLiteral("Show stats"));
 
     gridToggle_ = makeWidget<QCheckBox>(
-        this, [](auto* c) { c->setChecked(true); }, QStringLiteral("Show grid"));
+        this, [](auto* c) { c->setChecked(false); }, QStringLiteral("Show grid"));
     neighbourhoodCombo_ = makeWidget<QComboBox>(
         this,
         [](auto* c) { c->addItems({QStringLiteral("Von Neumann"), QStringLiteral("Moore")}); });
@@ -60,7 +60,7 @@ void MainWindow::buildLayout()
     mainLayout->setContentsMargins(0, 0, 0, 0);
 
     auto* left = new QWidget(centralWidget);
-    left->setStyleSheet(Config::leftBlockColor);
+    // left->setStyleSheet(Config::leftBlockColor);
     auto* leftLayout = new QVBoxLayout(left);
     contentStack_->addWidget(gridWidget_);
     contentStack_->addWidget(statsWidget_);

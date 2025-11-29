@@ -10,12 +10,14 @@
 #include <QRectF>
 #include <QSize>
 #include <QString>
-#include <QtSvg/QSvgRenderer>
-#include <array>
+#include <QStringview>
+#include <QSvgrenderer>
 #include <cstdint>
 #include <optional>
-#include <span>
 #include <vector>
+
+class QXmlStreamReader;
+class QXmlStreamAttributes;
 
 class UsMap
 {
@@ -31,25 +33,49 @@ class UsMap
         };
 
         UsMap(QString svgFilePath, int cols, int rows);
-        bool      buildProducts(QString* errorMessage = nullptr);
-        Products& getProducts() const;
 
-        void drawBackground(QPainter& painter, const QRect& rect) const;
+        [[nodiscard]] bool loadAndParseSvg(QString* errorMessage);
+        [[nodiscard]] bool buildStateProducts(QString* errorMessage = nullptr);
 
+        [[nodiscard]] const Products& getProducts() const;
+
+        [[nodiscard]] bool    isViewValid(QSize viewSize) const;
+        [[nodiscard]] QPoint  mapViewToProduct(QPointF position, QSize viewSize) const;
+        [[nodiscard]] bool    isInProductBounds(QPoint point) const;
         [[nodiscard]] uint8_t stateAtViewPos(QPointF position, QSize viewSize) const;
 
-        int                   stateCount() const { return static_cast<int>(m_states.size()); }
+        [[nodiscard]] int     stateCount() const { return static_cast<int>(m_states.size()); }
+        [[nodiscard]] bool    isValidStateId(uint8_t stateId) const;
         [[nodiscard]] QString getStateName(uint8_t stateId) const;
-        QString               getStateId(uint8_t stateId) const;
-        std::optional<int>    indexOfAbbrev(QStringView abbrev) const;
+        [[nodiscard]] QString getStateId(uint8_t stateId) const;
+        [[nodiscard]] std::optional<int> indexOfAbbrev(QStringView abbrev) const;
 
-        bool readSvgFile(QString* errorMessage);
-        void patchSvgContent();
-        bool loadSvgPatched(QString* errorMessage);
-        bool loadSvgIntoRenderer(QString* errorMessage);
-        void setError(QString* errorMessage, const QString& message) const;
         void setDebug(bool on, QString dumpDir = {});
         void setDebugColorizeStates(bool on);
+
+        [[nodiscard]] bool readSvgFile(QString* errorMessage);
+        void               patchSvgContent();
+        [[nodiscard]] bool loadSvgPatched(QString* errorMessage);
+        [[nodiscard]] bool loadSvgIntoRenderer(QString* errorMessage);
+        void               setError(QString* errorMessage, const QString& message) const;
+
+        void                 buildMaskAndActiveStates(int cols, int rows);
+        [[nodiscard]] QImage renderColorImage(int cols, int rows) const;
+        QRgb                 quantColor(QRgb c) const;
+        QString              rgbToHex(QRgb c) const;
+        void renderSingleState(const QString& elemId, QImage& target, int cols, int rows) const;
+        [[nodiscard]] std::optional<QRgb> findDominantQuantizedColor(const QImage& img,
+                                                                     int& totalAlphaPixels) const;
+
+        void handleStateColorMapping(QRgb           best,
+                                     uint8_t        stateId,
+                                     const QString& elemId,
+                                     int            totalAlphaPixels);
+        void buildColorToStateMap(int cols, int rows);
+        void initProductsBuffers();
+        void assignStatesFromColorImage(const QImage& colorImage, int cols, int rows);
+
+        void drawStateOutlines(QPainter& painter, const QRect& rect) const;
 
     private:
         struct State
@@ -62,11 +88,13 @@ class UsMap
         QMap<QString, int>   m_stateIdToIndex;
         QHash<QRgb, uint8_t> m_colorToState;
 
-        QRectF svgViewBox() const;
+        [[nodiscard]] QRectF svgViewBox() const;
 
         QString              m_svgFilePath;
         mutable QSvgRenderer m_svgRenderer;
+        mutable QSvgRenderer m_svgOutlineRenderer;
         Products             m_outputProducts;
+        QByteArray           m_svgRawOriginal;
         QByteArray           m_svgRaw;
         std::vector<QString> m_stateNames;
 
@@ -82,14 +110,15 @@ class UsMap
 
         void debugSave(const QString& name, const QImage& img) const;
 
-        void    resetStates();
-        bool    isStateElement(const QString& tagName) const;
-        void    insertOrUpdateState(State&& state);
-        QString extractFill(const QXmlStreamAttributes& attributes) const;
-        void    processStateElement(const QXmlStreamAttributes& attributes);
-        void    reportXmlError(const QXmlStreamReader& xml) const;
-        bool    scanStatesFromSvg();
+        void                  resetStates();
+        [[nodiscard]] bool    isStateElement(const QString& tagName) const;
+        void                  insertOrUpdateState(State&& state);
+        [[nodiscard]] QString extractFill(const QXmlStreamAttributes& attributes) const;
+        void                  processStateElement(const QXmlStreamAttributes& attributes);
+        void                  reportXmlError(const QXmlStreamReader& xml) const;
+        [[nodiscard]] bool    scanStatesFromSvg();
+        [[nodiscard]] bool    loadSvgOutlines(QString* errorMessage);
 
-        static bool                isValidHexColor(const QString& hex);
-        static std::optional<QRgb> parseHexColor(const QString& hex);
+        [[nodiscard]] static bool                isValidHexColor(const QString& hex);
+        [[nodiscard]] static std::optional<QRgb> parseHexColor(const QString& hex);
 };
