@@ -2,6 +2,7 @@
 
 #include "Constants.hpp"
 #include "Simulation.hpp"
+#include "UsMap.hpp"
 
 #include <QColor>
 #include <QCursor>
@@ -16,8 +17,11 @@
 #include <cmath>
 #include <cstdint>
 #include <qnamespace.h>
+#include <qobject.h>
 #include <qtypes.h>
 #include <sys/stat.h>
+
+using namespace app::ui;
 
 GridWidget::GridWidget(QWidget* parent) : QWidget{parent}
 {
@@ -60,42 +64,6 @@ QColor GridWidget::getColorFor(CellData cell) const noexcept
     }
 }
 
-void GridWidget::paintEvent(QPaintEvent*)
-{
-    QPainter painter(this);
-    painter.fillRect(rect(), QColor(144, 213, 255));
-
-    if (!m_usMap || !m_sim)
-    {
-        return;
-    }
-
-    const QRectF destRectF = mapDestRect();
-    if (!destRectF.isValid())
-    {
-        return;
-    }
-
-    const QRect destRect = destRectF.toAlignedRect();
-
-    rebuildCellsImage();
-
-    painter.setRenderHint(QPainter::Antialiasing, false);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-
-    const auto& products = m_usMap->getProducts();
-    painter.drawImage(destRect, m_cellsImage, QRectF(0, 0, products.cols, products.rows));
-
-    m_usMap->drawStateOutlines(painter, destRect);
-
-    if (m_showGrid)
-    {
-        drawGrid(painter);
-    }
-
-    drawOuterFrame(painter);
-}
-
 void GridWidget::drawGrid(QPainter& painter) const
 {
     if (!m_usMap || !m_showGrid)
@@ -109,15 +77,13 @@ void GridWidget::drawGrid(QPainter& painter) const
         return;
     }
 
-    float cellWidth, cellHeight, mapWidth, mapHeight, originXCenter, originYCenter;
-    computeGeometry(m_zoom, cellWidth, cellHeight, mapWidth, mapHeight, originXCenter,
-                    originYCenter);
+    const Geometry g = computeGeometry(m_zoom);
 
-    const float originX = originXCenter + static_cast<float>(m_pan.x());
-    const float originY = originYCenter + static_cast<float>(m_pan.y());
+    const float originX = g.originXCenter + static_cast<float>(m_pan.x());
+    const float originY = g.originYCenter + static_cast<float>(m_pan.y());
 
     QPen pen(Qt::white);
-    pen.setColor(QColor(255, 255, 255, 40));
+    pen.setColor(QColor(255, 255, 255, Config::GridWidget::gridAlpha));
     pen.setWidth(1);
     pen.setCosmetic(true);
     painter.setPen(pen);
@@ -125,26 +91,42 @@ void GridWidget::drawGrid(QPainter& painter) const
     for (int x = 1; x < products.cols; ++x)
     {
         const qreal xpos =
-            static_cast<qreal>(originX) + static_cast<qreal>(x) * static_cast<qreal>(cellWidth);
+            static_cast<qreal>(originX) + static_cast<qreal>(x) * static_cast<qreal>(g.cellWidth);
         painter.drawLine(
             QPointF{xpos, static_cast<qreal>(originY)},
-            QPointF{xpos, static_cast<qreal>(originY) + static_cast<qreal>(mapHeight)});
+            QPointF{xpos, static_cast<qreal>(originY) + static_cast<qreal>(g.mapHeight)});
     }
     for (int y = 1; y < products.rows; ++y)
     {
         const qreal ypos =
-            static_cast<qreal>(originY) + static_cast<qreal>(y) * static_cast<qreal>(cellHeight);
-        painter.drawLine(QPointF{static_cast<qreal>(originX), ypos},
-                         QPointF{static_cast<qreal>(originX) + static_cast<qreal>(mapWidth), ypos});
+            static_cast<qreal>(originY) + static_cast<qreal>(y) * static_cast<qreal>(g.cellHeight);
+        painter.drawLine(
+            QPointF{static_cast<qreal>(originX), ypos},
+            QPointF{static_cast<qreal>(originX) + static_cast<qreal>(g.mapWidth), ypos});
     }
+}
+
+bool GridWidget::canPaint() const noexcept
+{
+    return m_usMap and m_sim;
+}
+
+void GridWidget::drawCells(QPainter& painter, const QRectF& destRectF) const
+{
+    const auto& products = m_usMap->getProducts();
+    const QRect destRect = destRectF.toAlignedRect();
+    painter.drawImage(destRect, m_cellsImage, QRectF(0, 0, products.cols, products.rows));
+}
+
+void GridWidget::drawOutlines(QPainter& painter, const QRectF& destRectF) const
+{
+    m_usMap->drawStateOutlines(painter, destRectF.toAlignedRect());
 }
 
 void GridWidget::drawOuterFrame(QPainter& painter) const
 {
-    const int frameThickness = 1;
-
     QPen framePen(Qt::black);
-    framePen.setWidth(frameThickness);
+    framePen.setWidth(Config::GridWidget::frameThickness);
     framePen.setJoinStyle(Qt::MiterJoin);
     framePen.setCosmetic(true);
     painter.setPen(framePen);
@@ -156,26 +138,59 @@ void GridWidget::drawOuterFrame(QPainter& painter) const
     painter.drawRect(frameRect);
 }
 
-void GridWidget::computeGeometry(qreal  zoom,
-                                 float& cellWidth,
-                                 float& cellHeight,
-                                 float& mapWidth,
-                                 float& mapHeight,
-                                 float& originXCenter,
-                                 float& originYCenter) const
+void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
+{
+    if (!m_usMap)
+    {
+        return;
+    }
+
+    const uint8_t sid = stateAtWidgetPos(pos);
+    if (sid == UsMap::kNoState)
+    {
+        return;
+    }
+
+    const QPoint cell = productPointFromWidgetPos(pos);
+    if (cell.x() < 0 || cell.y() < 0)
+    {
+        return;
+    }
+
+    const int    stateId = static_cast<int>(sid);
+    const QColor red(255, 0, 0);
+    const QColor green(0, 255, 0);
+
+    if (buttons & Qt::LeftButton)
+    {
+        m_coloredCells.insert(cell, red);
+    }
+
+    if (buttons & Qt::RightButton)
+    {
+        m_coloredStates.insert(stateId, green);
+    }
+
+    update();
+}
+
+GridWidget::Geometry GridWidget::computeGeometry(qreal zoom) const
 {
     const auto& products = m_usMap->getProducts();
 
-    cellWidth =
+    Geometry g{};
+    g.cellWidth =
         static_cast<float>(width()) / static_cast<float>(products.cols) * static_cast<float>(zoom);
-    cellHeight =
+    g.cellHeight =
         static_cast<float>(height()) / static_cast<float>(products.rows) * static_cast<float>(zoom);
 
-    mapWidth  = cellWidth * static_cast<float>(products.cols);
-    mapHeight = cellHeight * static_cast<float>(products.rows);
+    g.mapWidth  = g.cellWidth * static_cast<float>(products.cols);
+    g.mapHeight = g.cellHeight * static_cast<float>(products.rows);
 
-    originXCenter = 0.5f * (static_cast<float>(width()) - mapWidth);
-    originYCenter = 0.5f * (static_cast<float>(height()) - mapHeight);
+    g.originXCenter = 0.5f * (static_cast<float>(width()) - g.mapWidth);
+    g.originYCenter = 0.5f * (static_cast<float>(height()) - g.mapHeight);
+
+    return g;
 }
 
 QRectF GridWidget::mapDestRect() const
@@ -188,18 +203,16 @@ QRectF GridWidget::mapDestRect() const
     if (products.cols <= 0 || products.rows <= 0)
         return QRectF();
 
-    float cellWidth, cellHeight, mapWidth, mapHeight, originXCenter, originYCenter;
-    computeGeometry(m_zoom, cellWidth, cellHeight, mapWidth, mapHeight, originXCenter,
-                    originYCenter);
+    const Geometry g = computeGeometry(m_zoom);
 
-    const float originX = originXCenter + static_cast<float>(m_pan.x());
-    const float originY = originYCenter + static_cast<float>(m_pan.y());
+    const float originX = g.originXCenter + static_cast<float>(m_pan.x());
+    const float originY = g.originYCenter + static_cast<float>(m_pan.y());
 
     return QRectF(static_cast<qreal>(originX), static_cast<qreal>(originY),
-                  static_cast<qreal>(mapWidth), static_cast<qreal>(mapHeight));
+                  static_cast<qreal>(g.mapWidth), static_cast<qreal>(g.mapHeight));
 }
 
-void GridWidget::rebuildCellsImage() const
+void GridWidget::rebuildCellsImageIfNeeded() const
 {
     if (!m_usMap || !m_sim)
     {
@@ -232,8 +245,14 @@ void GridWidget::rebuildCellsImage() const
 
             QColor color = getColorFor(m_sim->cell(x, y));
 
-            const int stateId = products.stateIds[static_cast<std::size_t>(index)];
-            if (m_coloredStates.contains(stateId))
+            const int    stateId = products.stateIds[static_cast<std::size_t>(index)];
+            const QPoint cellPoint{x, y};
+
+            if (m_coloredCells.contains(cellPoint))
+            {
+                color = m_coloredCells.value(cellPoint);
+            }
+            else if (m_coloredStates.contains(stateId))
             {
                 color = m_coloredStates.value(stateId);
             }
@@ -323,6 +342,60 @@ QString GridWidget::tooltipTextForState(uint8_t stateId) const
     return QStringLiteral("%1 (%2)").arg(full, abbr);
 }
 
+void GridWidget::updatePanForZoom(const QPointF& cursorPos, qreal newZoom)
+{
+    const Geometry before = computeGeometry(m_zoom);
+
+    const float originXBefore = before.originXCenter + static_cast<float>(m_pan.x());
+    const float originYBefore = before.originYCenter + static_cast<float>(m_pan.y());
+
+    const qreal mapX =
+        (cursorPos.x() - static_cast<qreal>(originXBefore)) / static_cast<qreal>(before.cellWidth);
+    const qreal mapY =
+        (cursorPos.y() - static_cast<qreal>(originYBefore)) / static_cast<qreal>(before.cellHeight);
+
+    m_zoom = newZoom;
+
+    const Geometry after = computeGeometry(m_zoom);
+
+    m_pan.setX(cursorPos.x() - static_cast<qreal>(after.originXCenter) -
+               mapX * static_cast<qreal>(after.cellWidth));
+    m_pan.setY(cursorPos.y() - static_cast<qreal>(after.originYCenter) -
+               mapY * static_cast<qreal>(after.cellHeight));
+}
+
+void GridWidget::paintEvent(QPaintEvent*)
+{
+    QPainter painter(this);
+    painter.fillRect(rect(), Config::GridWidget::backgroundColor);
+
+    if (not canPaint())
+    {
+        return;
+    }
+
+    const QRectF destRectF = mapDestRect();
+    if (!destRectF.isValid())
+    {
+        return;
+    }
+
+    rebuildCellsImageIfNeeded();
+
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+
+    drawCells(painter, destRectF);
+    drawOutlines(painter, destRectF);
+
+    if (m_showGrid)
+    {
+        drawGrid(painter);
+    }
+
+    drawOuterFrame(painter);
+}
+
 void GridWidget::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::MiddleButton)
@@ -330,8 +403,7 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
         m_isPanning  = true;
         m_lastPanPos = event->pos();
         setCursor(Qt::ClosedHandCursor);
-        event->accept();
-        return;
+        return event->accept();
     }
 
     if (!m_usMap)
@@ -346,18 +418,24 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
     }
 
     int          stateId = static_cast<int>(sid);
-    const QColor yellow(255, 230, 0);
+    const QColor red(255, 0, 0);
     const QColor green(0, 255, 0);
+    const QPoint cell = productPointFromWidgetPos(event->pos());
+
+    if (cell.x() < 0 || cell.y() < 0)
+    {
+        return;
+    }
 
     if (event->button() == Qt::LeftButton)
     {
-        if (m_coloredStates.contains(stateId) && m_coloredStates.value(stateId) == yellow)
+        if (m_coloredCells.contains(cell) && m_coloredCells.value(cell) == red)
         {
-            m_coloredStates.remove(stateId);
+            m_coloredCells.remove(cell);
         }
         else
         {
-            m_coloredStates.insert(stateId, yellow);
+            m_coloredCells.insert(cell, red);
         }
     }
     else if (event->button() == Qt::RightButton)
@@ -376,7 +454,8 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
 
     const QString txt = tooltipTextForState(sid);
     QToolTip::hideText();
-    QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(), 3000);
+    QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
+                       Config::GridWidget::tooltopMs);
     update();
 }
 
@@ -390,18 +469,27 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
         m_pan.rx() += delta.x();
         m_pan.ry() += delta.y();
         update();
-        event->accept();
-        return;
+        return event->accept();
+    }
+
+    if (event->buttons() & (Qt::LeftButton | Qt::RightButton))
+    {
+        applyBrushAt(event->position(), event->buttons());
+        return event->accept();
     }
 
     if (!m_usMap)
+    {
         return;
+    }
 
     const uint8_t sid      = stateAtWidgetPos(event->pos());
     const int     newHover = (sid == UsMap::kNoState) ? -1 : int(sid);
 
     if (newHover == m_hoverSid)
+    {
         return;
+    }
 
     m_hoverSid = newHover;
 
@@ -409,7 +497,8 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
     {
         const QString txt = tooltipTextForState(sid);
         QToolTip::hideText();
-        QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(), 3000);
+        QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
+                           Config::GridWidget::tooltopMs);
     }
     else
     {
@@ -428,67 +517,36 @@ void GridWidget::wheelEvent(QWheelEvent* event)
 {
     if (!(event->modifiers() & Qt::ControlModifier))
     {
-        QWidget::wheelEvent(event);
-        return;
+        return QWidget::wheelEvent(event);
     }
 
     if (!m_usMap)
     {
-        event->ignore();
-        return;
+        return event->ignore();
+    }
+
+    const auto& products = m_usMap->getProducts();
+    if (products.cols <= 0 || products.rows <= 0)
+    {
+        return event->ignore();
     }
 
     const int delta = event->angleDelta().y();
     if (delta == 0)
     {
-        event->ignore();
-        return;
+        return event->ignore();
     }
 
-    const QPointF cursorPos = event->position();
-
-    const auto& products = m_usMap->getProducts();
-    if (products.cols <= 0 || products.rows <= 0)
-    {
-        event->ignore();
-        return;
-    }
-
-    float cellWidthBefore, cellHeightBefore, mapWidthBefore, mapHeightBefore, originXCenterBefore,
-        originYCenterBefore;
-
-    computeGeometry(m_zoom, cellWidthBefore, cellHeightBefore, mapWidthBefore, mapHeightBefore,
-                    originXCenterBefore, originYCenterBefore);
-
-    const float originXBefore = originXCenterBefore + static_cast<float>(m_pan.x());
-    const float originYBefore = originYCenterBefore + static_cast<float>(m_pan.y());
-
-    const qreal mapX =
-        (cursorPos.x() - static_cast<qreal>(originXBefore)) / static_cast<qreal>(cellWidthBefore);
-    const float mapY = (static_cast<float>(cursorPos.y()) - originYBefore) / cellHeightBefore;
-
-    constexpr qreal zoomStep = 1.1;
-    qreal           newZoom  = m_zoom * ((delta > 0) ? zoomStep : 1.0 / zoomStep);
-    newZoom                  = std::clamp(newZoom, 0.2, 5.0);
+    qreal newZoom =
+        m_zoom * ((delta > 0) ? Config::GridWidget::zoomStep : 1.0 / Config::GridWidget::zoomStep);
+    newZoom = std::clamp(newZoom, Config::GridWidget::zoomMin, Config::GridWidget::zoomMax);
 
     if (std::abs(newZoom - m_zoom) < 0.0001)
     {
-        event->ignore();
-        return;
+        return event->ignore();
     }
 
-    m_zoom = newZoom;
-
-    float cellWidthAfter, cellHeightAfter, mapWidthAfter, mapHeightAfter;
-    float originXCenterAfter, originYCenterAfter;
-    computeGeometry(m_zoom, cellWidthAfter, cellHeightAfter, mapWidthAfter, mapHeightAfter,
-                    originXCenterAfter, originYCenterAfter);
-
-    m_pan.setX(cursorPos.x() - static_cast<qreal>(originXCenterAfter) -
-               mapX * static_cast<qreal>(cellWidthAfter));
-
-    m_pan.setY(cursorPos.y() - static_cast<qreal>(originYCenterAfter) -
-               static_cast<qreal>(mapY) * static_cast<qreal>(cellHeightAfter));
+    updatePanForZoom(event->position(), newZoom);
 
     update();
     event->accept();
@@ -500,8 +558,7 @@ void GridWidget::mouseReleaseEvent(QMouseEvent* event)
     {
         m_isPanning = false;
         unsetCursor();
-        event->accept();
-        return;
+        return event->accept();
     }
 
     QWidget::mouseReleaseEvent(event);

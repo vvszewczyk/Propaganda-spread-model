@@ -4,10 +4,17 @@
 
 namespace Config
 {
-    int cellSize           = 1;
-    int gridCols           = static_cast<int>(std::floor(gridPixelWidth / double(cellSize)));
-    int gridRows           = static_cast<int>(std::floor(gridPixelHeight / double(cellSize)));
-    int gridDepth          = 50;
-    int randomGrainNumber  = 500;
-    int regularGrainStride = 10;
+    namespace Grid
+    {
+        int cellSize  = 1;
+        int gridCols  = static_cast<int>(std::floor(pixelWidth / double(cellSize)));
+        int gridRows  = static_cast<int>(std::floor(pixelHeight / double(cellSize)));
+        int gridDepth = 50;
+    } // namespace Grid
+
+    namespace Simulation
+    {
+        int randomGrainNumber  = 500;
+        int regularGrainStride = 10;
+    } // namespace Simulation
 } // namespace Config

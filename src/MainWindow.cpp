@@ -4,13 +4,12 @@ using namespace app::ui;
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
-      usMap_(std::make_unique<UsMap>(QStringLiteral("Propaganda-spread-model/map/us_test.svg"),
-                                     Config::gridCols,
-                                     Config::gridRows)),
-      simulation_(std::make_unique<Simulation>(Config::gridCols, Config::gridRows)),
+      usMap_(std::make_unique<UsMap>(
+          Config::Map::usSvgPath, Config::Grid::gridCols, Config::Grid::gridRows)),
+      simulation_(std::make_unique<Simulation>(Config::Grid::gridCols, Config::Grid::gridRows)),
       timer_(std::make_unique<QTimer>(this))
 {
-    setFixedSize(Config::windowWidth, Config::windowHeight);
+    setFixedSize(Config::Window::width, Config::Window::height);
     buildUi();
     buildLayout();
     wire();
@@ -24,7 +23,7 @@ void MainWindow::buildUi()
     gridWidget_   = new GridWidget(this);
     statsWidget_  = new QWidget(this);
 
-    gridWidget_->setFixedSize(Config::gridPixelWidth, Config::gridPixelHeight);
+    gridWidget_->setFixedSize(Config::Grid::pixelWidth, Config::Grid::pixelHeight);
     gridWidget_->setSimulation(simulation_.get());
 
     QString error;
@@ -34,20 +33,19 @@ void MainWindow::buildUi()
     }
     gridWidget_->setUsMap(usMap_.get());
 
-    simulationLabel_    = makeWidget<QLabel>(this, nullptr, QStringLiteral("Simulation settings"));
-    iterationLabel_     = makeWidget<QLabel>(this, nullptr, QStringLiteral("Iteration: 0"));
-    neighbourhoodLabel_ = makeWidget<QLabel>(this, nullptr, QStringLiteral("Neighbourhood"));
+    simulationLabel_    = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationSettings);
+    iterationLabel_     = makeWidget<QLabel>(this, nullptr, Config::UiText::iterationPrefix + "0");
+    neighbourhoodLabel_ = makeWidget<QLabel>(this, nullptr, Config::UiText::neighbourhood);
 
-    startButton_      = makeWidget<QPushButton>(this, nullptr, QStringLiteral("Start"));
-    resetButton_      = makeWidget<QPushButton>(this, nullptr, QStringLiteral("Reset"));
+    startButton_      = makeWidget<QPushButton>(this, nullptr, Config::UiText::start);
+    resetButton_      = makeWidget<QPushButton>(this, nullptr, Config::UiText::reset);
     toggleViewButton_ = makeWidget<QPushButton>(
-        this, [](auto* b) { b->setCheckable(true); }, QStringLiteral("Show stats"));
+        this, [](auto* b) { b->setCheckable(true); }, Config::UiText::showStats);
 
     gridToggle_ = makeWidget<QCheckBox>(
-        this, [](auto* c) { c->setChecked(false); }, QStringLiteral("Show grid"));
+        this, [](auto* c) { c->setChecked(false); }, Config::UiText::showGrid);
     neighbourhoodCombo_ = makeWidget<QComboBox>(
-        this,
-        [](auto* c) { c->addItems({QStringLiteral("Von Neumann"), QStringLiteral("Moore")}); });
+        this, [](auto* c) { c->addItems({Config::UiText::vonNeumann, Config::UiText::moore}); });
 }
 
 void MainWindow::buildLayout()
@@ -57,7 +55,8 @@ void MainWindow::buildLayout()
     // centralWidget->setStyleSheet(Config::centralWidgetColor); // lightgreen
 
     auto* mainLayout = new QHBoxLayout(centralWidget);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setContentsMargins(Config::Layout::mainMargin, Config::Layout::mainMargin,
+                                   Config::Layout::mainMargin, Config::Layout::mainMargin);
 
     auto* left = new QWidget(centralWidget);
     // left->setStyleSheet(Config::leftBlockColor);
@@ -67,7 +66,7 @@ void MainWindow::buildLayout()
     contentStack_->setCurrentIndex(0);
     leftLayout->addWidget(contentStack_, 1);
     leftLayout->addStretch();
-    mainLayout->addWidget(left, 7);
+    mainLayout->addWidget(left, Config::Layout::leftPanelStretch);
 
     auto* right = new QWidget(centralWidget);
     // right->setStyleSheet(Config::rightBlockColor);
@@ -78,7 +77,7 @@ void MainWindow::buildLayout()
     auto* rowButtons = new QHBoxLayout();
     rowButtons->addStretch();
     rowButtons->addWidget(startButton_);
-    rowButtons->addSpacing(6); // Space between buttons
+    rowButtons->addSpacing(Config::Layout::rowButtonsSpacing); // Space between buttons
     rowButtons->addWidget(resetButton_);
     rowButtons->addStretch();
     rightLayout->addLayout(rowButtons);
@@ -103,7 +102,7 @@ void MainWindow::buildLayout()
     rightLayout->addWidget(iterationLabel_, 0, Qt::AlignRight);
 
     // Add right panel to main layout
-    mainLayout->addWidget(right, 1);
+    mainLayout->addWidget(right, Config::Layout::rightPanelStretch);
 }
 
 void MainWindow::wire()
@@ -137,7 +136,7 @@ void MainWindow::onStartButtonClicked()
     }
     else
     {
-        timer_->start(100);
+        timer_->start(Config::Timing::simulationStepMs);
         startButton_->setText(QStringLiteral("Pause"));
     }
 }

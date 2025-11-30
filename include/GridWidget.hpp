@@ -10,61 +10,77 @@
 #include <QWidget>
 #include <cstdint>
 #include <qpainter.h>
+#include <qpoint.h>
 
-class GridWidget : public QWidget
+namespace app::ui
 {
-        Q_OBJECT
+    class GridWidget : public QWidget
+    {
+            Q_OBJECT
 
-    public:
-        explicit GridWidget(QWidget* parent = nullptr);
-        void setSimulation(const Simulation*) noexcept;
-        void setUsMap(const UsMap*) noexcept;
-        void setShowGrid(bool) noexcept;
+        public:
+            explicit GridWidget(QWidget* parent = nullptr);
+            void setSimulation(const Simulation*) noexcept;
+            void setUsMap(const UsMap*) noexcept;
+            void setShowGrid(bool) noexcept;
 
-        [[nodiscard]] QColor getColorFor(CellData) const noexcept;
+            [[nodiscard]] QColor getColorFor(CellData) const noexcept;
 
-    signals:
-        void cellRemoved(int x, int y);
+        signals:
+            void cellRemoved(int x, int y);
 
-    protected:
-        void paintEvent(QPaintEvent*) override;
-        void mousePressEvent(QMouseEvent*) override;
-        void mouseMoveEvent(QMouseEvent* event) override;
-        void mouseReleaseEvent(QMouseEvent* event) override;
-        void leaveEvent(QEvent* event) override;
-        void wheelEvent(QWheelEvent* event) override;
+        protected:
+            void paintEvent(QPaintEvent*) override;
+            void mousePressEvent(QMouseEvent*) override;
+            void mouseMoveEvent(QMouseEvent* event) override;
+            void mouseReleaseEvent(QMouseEvent* event) override;
+            void leaveEvent(QEvent* event) override;
+            void wheelEvent(QWheelEvent* event) override;
 
-    private:
-        const Simulation* m_sim{nullptr};
-        const UsMap*      m_usMap{nullptr};
+        private:
+            const Simulation* m_sim{nullptr};
+            const UsMap*      m_usMap{nullptr};
 
-        bool    m_showGrid{false};
-        qreal   m_zoom{1.0};
-        QPointF m_pan{0.0, 0.0};
-        bool    m_isPanning{false};
-        QPoint  m_lastPanPos;
+            bool    m_showGrid{false};
+            qreal   m_zoom{1.0};
+            QPointF m_pan{0.0, 0.0};
+            bool    m_isPanning{false};
+            QPoint  m_lastPanPos;
 
-        QSet<int>          m_selectedStateIds;
-        int                m_selectedSingleStateId{-1};
-        QHash<int, QColor> m_coloredStates;
-        int                m_hoverSid{-1};
+            QSet<int>             m_selectedStateIds;
+            int                   m_selectedSingleStateId{-1};
+            QHash<int, QColor>    m_coloredStates;
+            QHash<QPoint, QColor> m_coloredCells;
+            int                   m_hoverSid{-1};
 
-        mutable QImage m_cellsImage;
+            mutable QImage m_cellsImage;
 
-        void drawGrid(QPainter& painter) const;
-        void drawOuterFrame(QPainter& painter) const;
-        void computeGeometry(qreal  zoom,
-                             float& cellWidth,
-                             float& cellHeight,
-                             float& mapWidth,
-                             float& mapHeight,
-                             float& originXCenter,
-                             float& originYCenter) const;
+            struct Geometry
+            {
+                    float cellWidth;
+                    float cellHeight;
+                    float mapWidth;
+                    float mapHeight;
+                    float originXCenter;
+                    float originYCenter;
+            };
 
-        [[nodiscard]] QRectF mapDestRect() const;
-        void                 rebuildCellsImage() const;
+            void drawGrid(QPainter& painter) const;
+            bool canPaint() const noexcept;
+            void drawCells(QPainter& painter, const QRectF& destRectF) const;
+            void drawOutlines(QPainter& painter, const QRectF& destRectF) const;
+            void drawOuterFrame(QPainter& painter) const;
+            void applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons);
 
-        [[nodiscard]] QPoint  productPointFromWidgetPos(QPointF position) const;
-        [[nodiscard]] uint8_t stateAtWidgetPos(QPointF position) const;
-        [[nodiscard]] QString tooltipTextForState(uint8_t stateId) const;
-};
+            [[nodiscard]] QRectF mapDestRect() const;
+            void                 rebuildCellsImageIfNeeded() const;
+
+            [[nodiscard]] QPoint  productPointFromWidgetPos(QPointF position) const;
+            [[nodiscard]] uint8_t stateAtWidgetPos(QPointF position) const;
+            [[nodiscard]] QString tooltipTextForState(uint8_t stateId) const;
+
+            [[nodiscard]] Geometry computeGeometry(qreal zoom) const;
+
+            void updatePanForZoom(const QPointF& cursorPos, qreal newZoom);
+    };
+} // namespace app::ui
