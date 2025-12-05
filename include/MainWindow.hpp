@@ -43,22 +43,22 @@ namespace app::ui
             MainWindow& operator=(MainWindow&&)      = delete;
 
         private:
-            std::unique_ptr<UsMap>      usMap_;
-            std::unique_ptr<Simulation> simulation_;
-            std::unique_ptr<QTimer>     timer_;
+            std::unique_ptr<UsMap>      m_usMap;
+            std::unique_ptr<Simulation> m_simulation;
+            std::unique_ptr<QTimer>     m_timer;
 
-            QStackedWidget* contentStack_{nullptr};
-            GridWidget*     gridWidget_{nullptr};
-            QWidget*        statsWidget_{nullptr};
+            QStackedWidget* m_contentStack{nullptr};
+            GridWidget*     m_gridWidget{nullptr};
+            QWidget*        m_statsWidget{nullptr};
 
-            QLabel*      simulationLabel_{nullptr};
-            QLabel*      iterationLabel_{nullptr};
-            QLabel*      neighbourhoodLabel_{nullptr};
-            QPushButton* startButton_{nullptr};
-            QPushButton* resetButton_{nullptr};
-            QPushButton* toggleViewButton_{nullptr};
-            QCheckBox*   gridToggle_{nullptr};
-            QComboBox*   neighbourhoodCombo_{nullptr};
+            QLabel*      m_simulationLabel{nullptr};
+            QLabel*      m_iterationLabel{nullptr};
+            QLabel*      m_neighbourhoodLabel{nullptr};
+            QPushButton* m_startButton{nullptr};
+            QPushButton* m_resetButton{nullptr};
+            QPushButton* m_toggleViewButton{nullptr};
+            QCheckBox*   m_gridToggle{nullptr};
+            QComboBox*   m_neighbourhoodCombo{nullptr};
 
             void buildUi();
             void buildLayout();
