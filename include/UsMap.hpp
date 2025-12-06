@@ -54,7 +54,7 @@ class UsMap
         void setDebugColorizeStates(bool on);
 
         [[nodiscard]] bool readSvgFile(QString* errorMessage);
-        void               patchSvgContent();
+        void               removeStatesOutlines();
         [[nodiscard]] bool loadSvgPatched(QString* errorMessage);
         [[nodiscard]] bool loadSvgIntoRenderer(QString* errorMessage);
         void               setError(QString* errorMessage, const QString& message) const;
@@ -103,9 +103,10 @@ class UsMap
 
         bool m_productsBuilt = false;
 
-        bool             m_debugEnabled  = false;
-        bool             m_debugColorize = false;
-        QString          m_debugDir;
+        bool    m_debugEnabled  = false;
+        bool    m_debugColorize = false;
+        QString m_debugDir;
+
         std::vector<int> m_statePixelCount;
 
         void debugSave(const QString& name, const QImage& img) const;
@@ -117,7 +118,7 @@ class UsMap
         void                  processStateElement(const QXmlStreamAttributes& attributes);
         void                  reportXmlError(const QXmlStreamReader& xml) const;
         [[nodiscard]] bool    scanStatesFromSvg();
-        [[nodiscard]] bool    loadSvgOutlines(QString* errorMessage);
+        [[nodiscard]] bool    loadSvgOutlineWithoutFill(QString* errorMessage);
 
         [[nodiscard]] static bool                isValidHexColor(const QString& hex);
         [[nodiscard]] static std::optional<QRgb> parseHexColor(const QString& hex);

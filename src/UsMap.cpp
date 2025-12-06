@@ -1,5 +1,6 @@
 #include "UsMap.hpp"
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -9,10 +10,13 @@
 #include <QtMath>
 #include <cstddef>
 #include <cstdint>
+#include <qbytearrayview.h>
+#include <qdebug.h>
 #include <qglobal.h>
 #include <qrgb.h>
 #include <qstringliteral.h>
 #include <qstringview.h>
+#include <span>
 
 UsMap::UsMap(QString svgFilePath, int cols, int rows)
     : m_svgFilePath(std::move(svgFilePath)), m_outputProducts({{}, {}, cols, rows})
@@ -22,13 +26,18 @@ UsMap::UsMap(QString svgFilePath, int cols, int rows)
     m_outputProducts.stateIds.resize(
         static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows), kNoState);
     m_statePixelCount.clear();
+
+    if (m_debugEnabled && m_debugDir.isEmpty())
+    {
+        setDebug(m_debugEnabled);
+    }
 }
 
 bool UsMap::loadAndParseSvg(QString* errorMessage)
 {
     if (!loadSvgPatched(errorMessage))
     {
-        setError(errorMessage, "QSvgRenderer: failed to load " + m_svgFilePath);
+        setError(errorMessage, "[UsMap] QSvgRenderer: failed to load " + m_svgFilePath);
         return false;
     }
 
@@ -37,8 +46,10 @@ bool UsMap::loadAndParseSvg(QString* errorMessage)
         qWarning() << "[UsMap] No states parsed from SVG.";
     }
 
-    if (!loadSvgOutlines(errorMessage))
+    if (!loadSvgOutlineWithoutFill(errorMessage))
     {
+        setError(errorMessage,
+                 "[UsMap] QSvgRenderer: failed to load outlines for " + m_svgFilePath);
         return false;
     }
 
@@ -67,18 +78,19 @@ void UsMap::buildMaskAndActiveStates(int cols, int rows)
     m_maskImage = QImage(cols, rows, QImage::Format_Grayscale8);
     m_maskImage.fill(Qt::black);
     {
-        QPainter pm(&m_maskImage);
-        pm.setRenderHint(QPainter::Antialiasing, false);
-        pm.setCompositionMode(QPainter::CompositionMode_Source);
-        m_svgRenderer.render(&pm, QRectF(0, 0, cols, rows));
+        QPainter painter(&m_maskImage);
+        painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        m_svgRenderer.render(&painter, QRectF(0, 0, cols, rows));
     }
     for (int y = 0; y < rows; ++y)
     {
-        const uchar* line = m_maskImage.constScanLine(y);
+        const uchar*           linePtr = m_maskImage.constScanLine(y);
+        std::span<const uchar> line{linePtr, static_cast<std::size_t>(cols)};
         for (int x = 0; x < cols; ++x)
         {
             m_outputProducts.activeStates[static_cast<std::size_t>(y * cols + x)] =
-                (line[x] > 0) ? 1 : 0;
+                (line[static_cast<std::size_t>(x)] > 0) ? 1 : 0;
         }
     }
     if (m_debugEnabled)
@@ -92,10 +104,10 @@ QImage UsMap::renderColorImage(int cols, int rows) const
     QImage colorImage(cols, rows, QImage::Format_ARGB32_Premultiplied);
     colorImage.fill(Qt::transparent);
     {
-        QPainter pc(&colorImage);
-        pc.setRenderHint(QPainter::Antialiasing, false);
-        pc.setCompositionMode(QPainter::CompositionMode_Source);
-        m_svgRenderer.render(&pc, QRectF(0, 0, cols, rows));
+        QPainter painter(&colorImage);
+        painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        m_svgRenderer.render(&painter, QRectF(0, 0, cols, rows));
     }
 
     if (m_debugEnabled)
@@ -121,10 +133,10 @@ void UsMap::renderSingleState(const QString& elemId, QImage& target, int cols, i
 {
     target.fill(Qt::transparent);
     {
-        QPainter p(&target);
-        p.setRenderHint(QPainter::Antialiasing, false);
-        p.setCompositionMode(QPainter::CompositionMode_Source);
-        m_svgRenderer.render(&p, elemId, QRectF(0, 0, cols, rows));
+        QPainter painter(&target);
+        painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        m_svgRenderer.render(&painter, elemId, QRectF(0, 0, cols, rows));
     }
 }
 
@@ -200,9 +212,9 @@ void UsMap::buildColorToStateMap(int cols, int rows)
 
     QImage oneState(cols, rows, QImage::Format_ARGB32_Premultiplied);
 
-    for (int sid = 0; sid < static_cast<int>(m_states.size()); ++sid)
+    for (int stateId = 0; stateId < static_cast<int>(m_states.size()); ++stateId)
     {
-        const auto&   state  = m_states[static_cast<std::size_t>(sid)];
+        const auto&   state  = m_states[static_cast<std::size_t>(stateId)];
         const QString elemId = state.id;
 
         if (!m_svgRenderer.elementExists(elemId))
@@ -226,7 +238,8 @@ void UsMap::buildColorToStateMap(int cols, int rows)
             continue;
         }
 
-        handleStateColorMapping(*dominantBest, static_cast<uint8_t>(sid), elemId, totalAlphaPixels);
+        handleStateColorMapping(*dominantBest, static_cast<uint8_t>(stateId), elemId,
+                                totalAlphaPixels);
     }
 }
 
@@ -302,7 +315,7 @@ bool UsMap::readSvgFile(QString* errorMessage)
 
     if (!mapFile.open(QIODevice::ReadOnly))
     {
-        setError(errorMessage, "Cannot open " + m_svgFilePath);
+        setError(errorMessage, "[UsMap] Cannot open " + m_svgFilePath);
         return false;
     }
 
@@ -311,60 +324,49 @@ bool UsMap::readSvgFile(QString* errorMessage)
     return true;
 }
 
-void UsMap::patchSvgContent()
-{
-    constexpr const char* strokes[] = {
-        "stroke:#000000",
-        "stroke:#000",
-        "stroke:black",
-    };
-
-    for (const auto& stroke : strokes)
-    {
-        m_svgRaw.replace(stroke, "stroke:none");
-    }
-}
-
-static QString makeOutlineSvg(const QByteArray& original)
+static QByteArray removeStatesFills(const QByteArray& original)
 {
     QString xml = QString::fromUtf8(original);
-    {
-        QRegularExpression re(R"(fill\s*:[^;"]*)", QRegularExpression::CaseInsensitiveOption);
-        xml.replace(re, "fill:none");
-    }
-    {
-        QRegularExpression re(R"(fill\s*=\s*"[^"]*")", QRegularExpression::CaseInsensitiveOption);
-        xml.replace(re, R"(fill="none")");
-    }
 
-    return xml;
+    QRegularExpression regex(R"(fill\s*:[^;"]*)");
+
+    xml.replace(regex, "fill:none");
+
+    return xml.toUtf8();
 }
 
-bool UsMap::loadSvgOutlines(QString* errorMessage)
+bool UsMap::loadSvgOutlineWithoutFill(QString* errorMessage)
 {
     if (m_svgRawOriginal.isEmpty())
     {
         if (!readSvgFile(errorMessage))
+        {
             return false;
+        }
     }
 
-    const QString    outlineSvg = makeOutlineSvg(m_svgRawOriginal);
-    const QByteArray bytes      = outlineSvg.toUtf8();
+    const QByteArray statesWithoutFill = removeStatesFills(m_svgRawOriginal);
 
-    if (!m_svgOutlineRenderer.load(bytes))
+    if (!m_svgOutlineRenderer.load(statesWithoutFill))
     {
-        setError(errorMessage, "QSvgRenderer: failed to load outlines for " + m_svgFilePath);
+        setError(errorMessage,
+                 "[UsMap] QSvgRenderer: failed to load outlines for " + m_svgFilePath);
         return false;
     }
 
     return true;
 }
 
+void UsMap::removeStatesOutlines()
+{
+    m_svgRaw.replace("stroke:#000", "stroke:none");
+}
+
 bool UsMap::loadSvgIntoRenderer(QString* errorMessage)
 {
     if (!m_svgRenderer.load(m_svgRaw))
     {
-        setError(errorMessage, "QSvgRenderer: failed to load patched svg");
+        setError(errorMessage, "[UsMap] QSvgRenderer: failed to load patched svg");
         return false;
     }
 
@@ -378,7 +380,7 @@ bool UsMap::loadSvgPatched(QString* errorMessage)
         return false;
     }
 
-    patchSvgContent();
+    removeStatesOutlines();
 
     if (!loadSvgIntoRenderer(errorMessage))
     {
@@ -421,63 +423,71 @@ void UsMap::resetStates()
 
 bool UsMap::isStateElement(const QString& tag) const
 {
-    static constexpr const char* tags[] = {"path", "polygon", "rect", "g"};
-
-    for (const char* t : tags)
+    if (tag == QLatin1StringView("path"))
     {
-        if (tag.compare(QLatin1StringView(t), Qt::CaseInsensitive) == 0)
-            return true;
+        return true;
     }
     return false;
 }
 
-QString UsMap::extractFill(const QXmlStreamAttributes& attrs) const
+QString UsMap::extractFill(const QXmlStreamAttributes& attributes) const
 {
-    if (const auto fill = attrs.value("fill"); !fill.isEmpty())
+    const auto style = attributes.value("style");
+    if (style.isEmpty())
     {
-        return fill.toString().trimmed();
+        return {};
     }
 
-    if (const auto style = attrs.value("style"); !style.isEmpty())
+    // "stroke-width:0.97063118;fill:#HexColor"
+    for (const auto& stylePart : style.toString().split(';', Qt::SkipEmptyParts))
     {
-        for (const auto& kv : style.toString().split(';', Qt::SkipEmptyParts))
+        const int position = static_cast<int>(stylePart.indexOf(':'));
+        if (position > 0 && stylePart.left(position) == QLatin1StringView("fill"))
         {
-            const int pos = static_cast<int>(kv.indexOf(':'));
-            if (pos > 0 && kv.left(pos).trimmed().compare("fill", Qt::CaseInsensitive) == 0)
-                return kv.mid(pos + 1).trimmed();
+            if (m_debugEnabled)
+            {
+                qDebug() << "[UsMap] style found:" << style;
+            }
+            return stylePart.mid(position + 1);
         }
     }
     return {};
 }
 
-void UsMap::processStateElement(const QXmlStreamAttributes& attrs)
+void UsMap::processStateElement(const QXmlStreamAttributes& attributes)
 {
     State state;
-    state.id = attrs.value("id").toString().trimmed();
-    if (state.id.isEmpty())
+    state.id   = attributes.value("id").toString();
+    state.name = attributes.value("data-name").toString();
+
+    if (state.id.isEmpty() || state.name.isEmpty())
+    {
         return;
+    }
 
-    state.name = attrs.value("data-name").toString().trimmed();
-
-    if (auto rgb = parseHexColor(extractFill(attrs)))
+    if (auto rgb = parseHexColor(extractFill(attributes)))
+    {
         state.fill = *rgb;
+    }
 
     insertOrUpdateState(std::move(state));
 }
 
-void UsMap::insertOrUpdateState(State&& st)
+void UsMap::insertOrUpdateState(State&& state)
 {
-    if (m_stateIdToIndex.contains(st.id))
+    if (m_stateIdToIndex.contains(state.id))
     {
-        std::size_t idx = static_cast<std::size_t>(m_stateIdToIndex.value(st.id));
-        if (m_states[idx].name.isEmpty() && !st.name.isEmpty())
-            m_states[idx].name = st.name;
+        std::size_t idx = static_cast<std::size_t>(m_stateIdToIndex.value(state.id));
+        if (m_states[idx].name.isEmpty() && !state.name.isEmpty())
+        {
+            m_states[idx].name = state.name;
+        }
         return;
     }
 
     int idx = static_cast<int>(m_states.size());
-    m_stateIdToIndex.insert(st.id, idx);
-    m_states.push_back(std::move(st));
+    m_stateIdToIndex.insert(state.id, idx);
+    m_states.push_back(std::move(state));
 }
 
 void UsMap::reportXmlError(const QXmlStreamReader& xml) const
@@ -497,7 +507,9 @@ bool UsMap::scanStatesFromSvg()
         xml.readNext();
 
         if (!xml.isStartElement())
+        {
             continue;
+        }
 
         const QString tagName = xml.name().toString();
         if (!isStateElement(tagName))
@@ -559,7 +571,8 @@ void UsMap::setDebug(bool enabled, QString dumpDir)
 {
     m_debugEnabled = enabled;
 
-    m_debugDir = dumpDir.isEmpty() ? QDir::tempPath() + "/usmap_debug" : std::move(dumpDir);
+    m_debugDir =
+        dumpDir.isEmpty() ? QCoreApplication::applicationDirPath() + "/usmap_debug" : dumpDir;
 
     if (!m_debugEnabled)
     {
