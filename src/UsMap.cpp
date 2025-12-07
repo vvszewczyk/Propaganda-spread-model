@@ -118,128 +118,34 @@ QImage UsMap::renderColorImage(int cols, int rows) const
     return colorImage;
 }
 
-QRgb UsMap::quantColor(QRgb c) const
-{
-    return qRgb(qRed(c) & 0xF8, qGreen(c) & 0xF8, qBlue(c) & 0xF8);
-}
-
 QString UsMap::rgbToHex(QRgb c) const
 {
     const int rgb = (qRed(c) << 16) | (qGreen(c) << 8) | qBlue(c);
     return QStringLiteral("#%1").arg(rgb, 6, 16, QChar('0'));
 }
 
-void UsMap::renderSingleState(const QString& elemId, QImage& target, int cols, int rows) const
-{
-    target.fill(Qt::transparent);
-    {
-        QPainter painter(&target);
-        painter.setRenderHint(QPainter::Antialiasing, false);
-        painter.setCompositionMode(QPainter::CompositionMode_Source);
-        m_svgRenderer.render(&painter, elemId, QRectF(0, 0, cols, rows));
-    }
-}
-
-std::optional<QRgb> UsMap::findDominantQuantizedColor(const QImage& img,
-                                                      int&          totalAlphaPixels) const
-{
-    QHash<QRgb, int> hist;
-    totalAlphaPixels = 0;
-    const int cols   = img.width();
-    const int rows   = img.height();
-
-    for (int y = 0; y < rows; ++y)
-    {
-        const QRgb* line = reinterpret_cast<const QRgb*>(img.constScanLine(y));
-        for (int x = 0; x < cols; ++x)
-        {
-            QRgb c = line[x];
-            if (qAlpha(c) > 160)
-            {
-                ++totalAlphaPixels;
-                hist[quantColor(c)] += 1;
-            }
-        }
-    }
-
-    if (totalAlphaPixels == 0)
-    {
-        return std::nullopt;
-    }
-
-    QRgb best    = 0;
-    int  bestCnt = -1;
-    for (auto it = hist.constBegin(); it != hist.constEnd(); ++it)
-    {
-        if (it.value() > bestCnt)
-        {
-            bestCnt = it.value();
-            best    = it.key();
-        }
-    }
-
-    return best;
-}
-
-void UsMap::handleStateColorMapping(QRgb           best,
-                                    uint8_t        stateId,
-                                    const QString& elemId,
-                                    int            totalAlphaPixels)
-{
-    auto it = m_colorToState.constFind(best);
-    if (it != m_colorToState.constEnd() && it.value() != static_cast<uint8_t>(stateId))
-    {
-        const uint8_t otherSid = it.value();
-        const QString otherId =
-            (otherSid < m_states.size()) ? m_states[otherSid].id : QStringLiteral("?");
-        qWarning() << "[UsMap] COLOR CONFLICT" << rgbToHex(best) << "between" << otherId << "and"
-                   << elemId << "(ensure unique fills in SVG)";
-        return;
-    }
-
-    m_colorToState.insert(best, static_cast<uint8_t>(stateId));
-
-    if (m_debugEnabled)
-    {
-        qDebug() << "[UsMap] color map (by analysis):" << elemId << rgbToHex(best)
-                 << "pixels:" << totalAlphaPixels;
-    }
-}
-
-void UsMap::buildColorToStateMap(int cols, int rows)
+void UsMap::buildColorToStateMap()
 {
     m_colorToState.clear();
 
-    QImage oneState(cols, rows, QImage::Format_ARGB32_Premultiplied);
-
     for (int stateId = 0; stateId < static_cast<int>(m_states.size()); ++stateId)
     {
-        const auto&   state  = m_states[static_cast<std::size_t>(stateId)];
-        const QString elemId = state.id;
+        const auto& state = m_states[static_cast<std::size_t>(stateId)];
 
-        if (!m_svgRenderer.elementExists(elemId))
+        QRgb svgColor = state.fill;
+
+        if (svgColor == 0)
         {
-            qWarning() << "[UsMap] Missing element:" << elemId;
+            qWarning() << "[UsMap] No fill color for state:" << state.id;
             continue;
         }
 
-        renderSingleState(elemId, oneState, cols, rows);
+        m_colorToState.insert(svgColor, static_cast<uint8_t>(stateId));
 
         if (m_debugEnabled)
         {
-            debugSave(QString("state_%1.png").arg(elemId), oneState);
+            qDebug() << "[UsMap] State:" << state.id << "| Fill color:" << rgbToHex(svgColor);
         }
-
-        int  totalAlphaPixels = 0;
-        auto dominantBest     = findDominantQuantizedColor(oneState, totalAlphaPixels);
-        if (!dominantBest)
-        {
-            qWarning() << "[UsMap] Empty render for" << elemId << "(transparent?)";
-            continue;
-        }
-
-        handleStateColorMapping(*dominantBest, static_cast<uint8_t>(stateId), elemId,
-                                totalAlphaPixels);
     }
 }
 
@@ -255,7 +161,9 @@ void UsMap::assignStatesFromColorImage(const QImage& colorImage, int cols, int r
 
     for (int y = 0; y < rows; ++y)
     {
-        const QRgb* cl = reinterpret_cast<const QRgb*>(colorImage.constScanLine(y));
+        const QRgb*           linePtr = reinterpret_cast<const QRgb*>(colorImage.constScanLine(y));
+        std::span<const QRgb> line{linePtr, static_cast<std::size_t>(cols)};
+
         for (int x = 0; x < cols; ++x)
         {
             const int i = y * cols + x;
@@ -263,13 +171,12 @@ void UsMap::assignStatesFromColorImage(const QImage& colorImage, int cols, int r
             {
                 continue;
             }
-            if (qAlpha(cl[x]) == 0)
+            if (qAlpha(line[static_cast<std::size_t>(x)]) == 0)
             {
                 continue;
             }
 
-            const QRgb key = quantColor(cl[x]);
-            auto       it  = m_colorToState.constFind(key);
+            auto it = m_colorToState.constFind(line[static_cast<std::size_t>(x)]);
             if (it == m_colorToState.constEnd())
             {
                 continue;
@@ -294,7 +201,7 @@ bool UsMap::buildStateProducts(QString* errorMessage)
 
     buildMaskAndActiveStates(cols, rows);
     const QImage colorImage = renderColorImage(cols, rows);
-    buildColorToStateMap(cols, rows);
+    buildColorToStateMap();
     assignStatesFromColorImage(colorImage, cols, rows);
 
     m_productsBuilt = true;
@@ -524,44 +431,6 @@ bool UsMap::scanStatesFromSvg()
     return !m_states.empty();
 }
 
-bool UsMap::isViewValid(QSize viewSize) const
-{
-    return m_productsBuilt && viewSize.width() > 0 && viewSize.height() > 0;
-}
-
-QPoint UsMap::mapViewToProduct(QPointF position, QSize viewSize) const
-{
-    const auto sx = static_cast<qreal>(m_outputProducts.cols) / viewSize.width();
-    const auto sy = static_cast<qreal>(m_outputProducts.rows) / viewSize.height();
-    return {static_cast<int>(position.x() * sx), static_cast<int>(position.y() * sy)};
-}
-
-bool UsMap::isInProductBounds(QPoint point) const
-{
-    return point.x() >= 0 && point.y() >= 0 && point.x() < m_outputProducts.cols &&
-           point.y() < m_outputProducts.rows;
-}
-
-uint8_t UsMap::stateAtViewPos(QPointF position, QSize viewSize) const
-{
-    if (!isViewValid(viewSize))
-    {
-        return kNoState;
-    }
-
-    const auto productPoints = mapViewToProduct(position, viewSize);
-
-    if (!isInProductBounds(productPoints))
-    {
-        return kNoState;
-    }
-
-    const auto index =
-        static_cast<std::size_t>(productPoints.y() * m_outputProducts.cols + productPoints.x());
-
-    return m_outputProducts.stateIds[index];
-}
-
 const UsMap::Products& UsMap::getProducts() const
 {
     return m_outputProducts;
@@ -581,11 +450,6 @@ void UsMap::setDebug(bool enabled, QString dumpDir)
 
     QDir().mkpath(m_debugDir);
     qDebug() << "[UsMap] Debug enabled. Dump dir:" << m_debugDir;
-}
-
-void UsMap::setDebugColorizeStates(bool on)
-{
-    m_debugColorize = on;
 }
 
 void UsMap::debugSave(const QString& name, const QImage& img) const
@@ -628,16 +492,4 @@ QString UsMap::getStateId(uint8_t stateId) const
         return {};
     }
     return m_states[stateId].id;
-}
-
-std::optional<int> UsMap::indexOfAbbrev(QStringView abbrev) const
-{
-    const QString key = abbrev.toString().trimmed().toUpper();
-
-    const auto it = m_stateIdToIndex.constFind(key);
-    if (it == m_stateIdToIndex.constEnd())
-    {
-        return std::nullopt;
-    }
-    return it.value();
 }

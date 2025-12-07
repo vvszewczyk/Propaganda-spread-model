@@ -9,6 +9,7 @@
 #include <QPoint>
 #include <QWidget>
 #include <cstdint>
+#include <qelapsedtimer.h>
 #include <qpainter.h>
 #include <qpoint.h>
 
@@ -23,11 +24,15 @@ namespace app::ui
             void setSimulation(const Simulation*) noexcept;
             void setUsMap(const UsMap*) noexcept;
             void setShowGrid(bool) noexcept;
+            void clearMap() noexcept;
+            void resetView() noexcept;
 
             [[nodiscard]] QColor getColorFor(CellData) const noexcept;
 
         signals:
             void cellRemoved(int x, int y);
+            void zoomChanged(double zoomFactor);
+            void cellInfoChanged(const QString& info);
 
         protected:
             void paintEvent(QPaintEvent*) override;
@@ -71,6 +76,7 @@ namespace app::ui
             void drawOutlines(QPainter& painter, const QRectF& destRectF) const;
             void drawOuterFrame(QPainter& painter) const;
             void applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons);
+            void updateCellInfoAt(const QPointF& position);
 
             [[nodiscard]] QRectF mapDestRect() const;
             void                 rebuildCellsImageIfNeeded() const;

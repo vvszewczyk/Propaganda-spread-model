@@ -18,6 +18,8 @@
 #include <cstdint>
 #include <qnamespace.h>
 #include <qobject.h>
+#include <qpoint.h>
+#include <qstringview.h>
 #include <qtypes.h>
 #include <sys/stat.h>
 
@@ -42,6 +44,24 @@ void GridWidget::setUsMap(const UsMap* usMap) noexcept
 void GridWidget::setShowGrid(bool on) noexcept
 {
     this->m_showGrid = on;
+    update();
+}
+
+void GridWidget::clearMap() noexcept
+{
+    m_coloredCells.clear();
+    m_coloredStates.clear();
+    m_selectedStateIds.clear();
+    m_selectedSingleStateId = -1;
+    m_hoverSid              = -1;
+    update();
+}
+
+void GridWidget::resetView() noexcept
+{
+    m_zoom = 1.0;
+    m_pan  = QPointF{0.0, 0.0};
+    emit zoomChanged(m_zoom);
     update();
 }
 
@@ -172,6 +192,65 @@ void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
     }
 
     update();
+}
+
+void GridWidget::updateCellInfoAt(const QPointF& position)
+{
+    if (!m_usMap || !m_sim)
+    {
+        emit cellInfoChanged(QString());
+        return;
+    }
+
+    const uint8_t stateId = stateAtWidgetPos(position);
+    if (stateId == UsMap::kNoState)
+    {
+        emit cellInfoChanged(QString());
+        return;
+    }
+
+    const QPoint cell = productPointFromWidgetPos(position);
+    if (cell.x() < 0 || cell.y() < 0)
+    {
+        emit cellInfoChanged(QString());
+        return;
+    }
+
+    const auto cellData = m_sim->cell(cell.x(), cell.y());
+    QString    stateStr;
+    switch (cellData.state)
+    {
+    case State::S:
+        stateStr = QStringLiteral("S");
+        break;
+    case State::E:
+        stateStr = QStringLiteral("E");
+        break;
+    case State::I:
+        stateStr = QStringLiteral("I");
+        break;
+    case State::R:
+        stateStr = QStringLiteral("R");
+        break;
+    case State::D:
+        stateStr = QStringLiteral("D");
+        break;
+    default:
+        stateStr = QStringLiteral("?");
+        break;
+    }
+
+    const QString usState = tooltipTextForState(stateId);
+
+    const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\n(%4)\nResilience=%5\nFatigue=%6")
+                             .arg(cell.x())
+                             .arg(cell.y())
+                             .arg(stateStr)
+                             .arg(usState)
+                             .arg(cellData.resilience, 0, 'f', 2)
+                             .arg(cellData.fatigue, 0, 'f', 2);
+
+    emit cellInfoChanged(info);
 }
 
 GridWidget::Geometry GridWidget::computeGeometry(qreal zoom) const
@@ -355,6 +434,7 @@ void GridWidget::updatePanForZoom(const QPointF& cursorPos, qreal newZoom)
         (cursorPos.y() - static_cast<qreal>(originYBefore)) / static_cast<qreal>(before.cellHeight);
 
     m_zoom = newZoom;
+    emit zoomChanged(m_zoom);
 
     const Geometry after = computeGeometry(m_zoom);
 
@@ -456,6 +536,7 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
     QToolTip::hideText();
     QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
                        Config::GridWidget::tooltopMs);
+    updateCellInfoAt(event->position());
     update();
 }
 
@@ -488,6 +569,7 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
 
     if (newHover == m_hoverSid)
     {
+        updateCellInfoAt(event->position());
         return;
     }
 
@@ -499,10 +581,13 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
         QToolTip::hideText();
         QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
                            Config::GridWidget::tooltopMs);
+
+        updateCellInfoAt(event->position());
     }
     else
     {
         QToolTip::hideText();
+        emit cellInfoChanged(QString());
     }
 }
 
@@ -511,6 +596,7 @@ void GridWidget::leaveEvent(QEvent* event)
     Q_UNUSED(event)
     m_hoverSid = -1;
     QToolTip::hideText();
+    emit cellInfoChanged(QString());
 }
 
 void GridWidget::wheelEvent(QWheelEvent* event)

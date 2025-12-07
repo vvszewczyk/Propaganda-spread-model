@@ -1,5 +1,10 @@
 #include "MainWindow.hpp"
 
+#include <qlabel.h>
+#include <qnamespace.h>
+#include <qstringliteral.h>
+#include <qtypes.h>
+
 using namespace app::ui;
 
 MainWindow::MainWindow(QWidget* parent)
@@ -13,6 +18,7 @@ MainWindow::MainWindow(QWidget* parent)
     buildUi();
     buildLayout();
     wire();
+    m_fpsTimer.start();
 }
 
 MainWindow::~MainWindow() = default;
@@ -36,6 +42,9 @@ void MainWindow::buildUi()
     m_simulationLabel    = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationSettings);
     m_iterationLabel     = makeWidget<QLabel>(this, nullptr, Config::UiText::iterationPrefix + "0");
     m_neighbourhoodLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::neighbourhood);
+    m_cellInfoLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::cellInfoPrefix + "N/A");
+    m_zoomLabel     = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::zoom + "100%");
+    m_fpsLabel      = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::fps + "0");
 
     m_startButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::start);
     m_resetButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::reset);
@@ -95,11 +104,32 @@ void MainWindow::buildLayout()
 
     rightLayout->addStretch();
 
+    // Cell info
+    m_cellInfoLabel->setFrameShape(QFrame::StyledPanel);
+    m_cellInfoLabel->setFrameShadow(QFrame::Plain);
+    m_cellInfoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    m_cellInfoLabel->setMinimumHeight(60);
+    m_cellInfoLabel->setWordWrap(true);
+    m_cellInfoLabel->setStyleSheet(
+        "color: black; border: 1px solid black; border-radius: 4px; padding: 1px;");
+    rightLayout->addWidget(m_cellInfoLabel);
+
     // Grid/stats button
     rightLayout->addWidget(m_toggleViewButton, 0, Qt::AlignCenter);
 
     // Iterations label
     rightLayout->addWidget(m_iterationLabel, 0, Qt::AlignRight);
+
+    // FPS and zoom label
+    m_fpsLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_fpsLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_fpsLabel->setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
+
+    m_zoomLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_zoomLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_zoomLabel->setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
+
+    updateOverlayLabelsPosition();
 
     // Add right panel to main layout
     mainLayout->addWidget(right, Config::Layout::rightPanelStretch);
@@ -114,10 +144,50 @@ void MainWindow::wire()
     connect(m_timer.get(), SIGNAL(timeout()), this, SLOT(onStep()));
     connect(m_neighbourhoodCombo, SIGNAL(currentIndexChanged(int)), this,
             SLOT(onNeighbourhoodChanged(int)));
+    connect(m_gridWidget, &GridWidget::zoomChanged, this,
+            [this](double zoomFactor)
+            {
+                int percent = static_cast<int>(zoomFactor * 100.0 + 0.5);
+                if (percent == 99 || percent == 101)
+                {
+                    percent = 100;
+                }
+                m_zoomLabel->setText(QStringLiteral("Zoom: %1%").arg(percent));
+                updateOverlayLabelsPosition();
+            });
+    connect(m_gridWidget, &GridWidget::cellInfoChanged, this,
+            [this](const QString& info)
+            {
+                if (info.isEmpty())
+                {
+                    m_cellInfoLabel->setText(QStringLiteral("Cell: N/A"));
+                }
+                else
+                {
+                    m_cellInfoLabel->setText(info);
+                }
+            });
+}
+
+void MainWindow::countFps()
+{
+    ++m_fpsFrameCount;
+    const qint64 elapsedMs = m_fpsTimer.elapsed();
+    if (elapsedMs >= 1000)
+    {
+        const int fpsInt = m_fpsFrameCount;
+        m_fpsLabel->setText(QStringLiteral("FPS: %1").arg(fpsInt));
+        updateOverlayLabelsPosition();
+
+        m_fpsFrameCount = 0;
+        m_fpsTimer.restart();
+    }
 }
 
 void MainWindow::onStep()
 {
+    countFps();
+
     m_simulation->step();
     m_gridWidget->update();
 
@@ -133,9 +203,15 @@ void MainWindow::onStartButtonClicked()
     {
         m_timer->stop();
         m_startButton->setText(QStringLiteral("Start"));
+
+        m_fpsLabel->setText(QStringLiteral("FPS: 0"));
+        updateOverlayLabelsPosition();
     }
     else
     {
+        m_fpsFrameCount = 0;
+        m_fpsTimer.restart();
+
         m_timer->start(Config::Timing::simulationStepMs);
         m_startButton->setText(QStringLiteral("Pause"));
     }
@@ -144,9 +220,16 @@ void MainWindow::onStartButtonClicked()
 void MainWindow::onResetButtonClicked()
 {
     m_timer->stop();
+    m_fpsLabel->setText(QStringLiteral("FPS: 0"));
+    updateOverlayLabelsPosition();
+
     m_startButton->setText(QStringLiteral("Start"));
     m_simulation->reset();
+
+    m_gridWidget->clearMap();
+    m_gridWidget->resetView();
     m_gridWidget->update();
+
     clearStats();
     m_iterationLabel->setText(QStringLiteral("Iteration: 0"));
 }
@@ -175,4 +258,30 @@ void MainWindow::updateStats(int globalStep)
 
 void MainWindow::clearStats()
 {
+}
+
+void MainWindow::updateOverlayLabelsPosition()
+{
+    if (not m_gridWidget)
+    {
+        return;
+    }
+
+    if (m_fpsLabel)
+    {
+        m_fpsLabel->adjustSize();
+        const int x = Config::Layout::margin;
+        const int y = Config::Layout::margin;
+        m_fpsLabel->move(x, y);
+        m_fpsLabel->raise();
+    }
+
+    if (m_zoomLabel)
+    {
+        m_zoomLabel->adjustSize();
+        const int x = Config::Layout::margin;
+        const int y = m_gridWidget->height() - m_zoomLabel->height() - Config::Layout::margin;
+        m_zoomLabel->move(x, y);
+        m_zoomLabel->raise();
+    }
 }

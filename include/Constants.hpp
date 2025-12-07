@@ -1,5 +1,6 @@
 
 #include <QColor>
+#include <qstringliteral.h>
 #include <qvectornd.h>
 
 namespace Config
@@ -44,6 +45,9 @@ namespace Config
         inline const QString neighbourhood      = QStringLiteral("Neighbourhood");
         inline const QString vonNeumann         = QStringLiteral("Von Neumann");
         inline const QString moore              = QStringLiteral("Moore");
+        inline const QString zoom               = QStringLiteral("Zoom: ");
+        inline const QString fps                = QStringLiteral("FPS: ");
+        inline const QString cellInfoPrefix     = QStringLiteral("Cell: ");
     } // namespace UiText
 
     namespace Colors
@@ -55,7 +59,7 @@ namespace Config
 
     namespace Timing
     {
-        inline constexpr int simulationStepMs = 100;
+        inline constexpr int simulationStepMs = 16;
     } // namespace Timing
 
     namespace Map

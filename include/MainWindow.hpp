@@ -11,6 +11,8 @@
 #include <QtWidgets>
 #include <cstddef>
 #include <memory>
+#include <qelapsedtimer.h>
+#include <qlabel.h>
 #include <type_traits>
 // #include <QtCharts>
 // #include <QtWidgets/QMainWindow>
@@ -51,14 +53,21 @@ namespace app::ui
             GridWidget*     m_gridWidget{nullptr};
             QWidget*        m_statsWidget{nullptr};
 
-            QLabel*      m_simulationLabel{nullptr};
-            QLabel*      m_iterationLabel{nullptr};
-            QLabel*      m_neighbourhoodLabel{nullptr};
+            QLabel* m_simulationLabel{nullptr};
+            QLabel* m_iterationLabel{nullptr};
+            QLabel* m_neighbourhoodLabel{nullptr};
+            QLabel* m_zoomLabel{nullptr};
+            QLabel* m_fpsLabel{nullptr};
+            QLabel* m_cellInfoLabel{nullptr};
+
             QPushButton* m_startButton{nullptr};
             QPushButton* m_resetButton{nullptr};
             QPushButton* m_toggleViewButton{nullptr};
             QCheckBox*   m_gridToggle{nullptr};
             QComboBox*   m_neighbourhoodCombo{nullptr};
+
+            QElapsedTimer m_fpsTimer;
+            int           m_fpsFrameCount{0};
 
             void buildUi();
             void buildLayout();
@@ -66,6 +75,8 @@ namespace app::ui
             void setupStats();
             void updateStats(int globalStep);
             void clearStats();
+            void updateOverlayLabelsPosition();
+            void countFps();
 
         private slots:
             void onStep();

@@ -1,11 +1,36 @@
 #pragma once
 #include "Types.hpp"
 
+// Broadcast to jest "TV/internet/sondaże", globalny szum, który dodaje ekspozycję każdej komórce w
+// zależności od tego, ile A/B inwestuje w *Broadcast
+
+// Social to byłby dodatkowy, bardziej skomplikowany kanał losowych połączeń między komórkami
+// (niekoniecznie sąsiadujących w siatce)
+
+// DM to "lokalne rozmowy / prywatne wiadomości", które w CA są po prostu wpływem sąsiadów w
+// siatce (NeighbourhoodType, wLocal).
+
+// β₀ (beta0) – jak łatwo komórka „łapie” przekaz
+// → bazowa „czułość” na ekspozycję:  przy przejściu S → E albo S/E → I
+
+// ρ₀ (rho0) – jak łatwo z „Exposed” przejść do „Infested”
+// → bazowe E → I (przyjęcie narracji po zauważeniu)
+
+// γ₀ (gamma0) – jak szybko komórka przestaje szerzyć przekaz
+// → I → R (uodpornienie, fact-check)
+
+// δ₀ (delta0) – jak szybko wypada z gry
+// → I → D (ban/zmęczenie)
+
 struct BaseParameters
 {
-        float beta0 = 0.0f, gamma0 = 0.0f, rho0 = 0.0f, delta0 = 0.0f;
-        float sBroadcast = 0.0f, sSocial = 0.0f, sDM = 0.0f;
-        float wLocal = 0.0f;
+        float beta0 = 0.0f, gamma0 = 0.0f, rho0 = 0.0f,
+              delta0     = 0.0f; // współczynniki tego jak łatwo przejść między stanami
+        float sBroadcast = 0.0f, sSocial = 0.0f,
+              sDM = 0.0f; // wagi ile "warte" są poszczególne kanały (Broadcast, Social, DM) w
+                          // obliczaniu ekspozycji
+        float wLocal =
+            0.0f; // waga lokalnych sąsiadów (ile "warci" są sąsiedzi w danym sąsiedztwie)
 };
 
 struct Controls
@@ -17,15 +42,17 @@ struct Controls
 
 struct Player
 {
-        Controls controls;
-        float    budget    = 0.0f;
-        double   costWhite = 1.0, costGrey = 2.0, costBlack = 3.0;
+        Controls controls; // "pokrętła" jak mocno dana strona używa danego kanału/koloru propagandy
+                           // w danym kroku
+        float  budget    = 0.0f; // budżet jaki gracz może przeznaczyć na kampanię
+        double costWhite = 1.0, costGrey = 2.0, costBlack = 3.0; // ceny jednostek danej propagandy
 };
 
 struct Pools
 {
-        float deltaNational = 0.0f;
-        float pBand = 0.0f, etaBand = 0.0f;
-        float pUnder = 0.0f, etaUnder = 0.0f;
-        bool  perState = false;
+        float deltaNational = 0.0f; // przewaga A nad B w sondażach (np Ia=Ib albo różnica poparcia)
+        float pBand = 0.0f, etaBand = 0.0f; // parametry bandwagon effect - wszyscy idą za liderem
+        float pUnder   = 0.0f,
+              etaUnder = 0.0f;  // parametry underdog effect - wszyscy kibicują przegrywającemu
+        bool perState  = false; // czy liczymy globalnie czy na stan
 };
