@@ -62,9 +62,12 @@ namespace app::ui
 
             QPushButton* m_startButton{nullptr};
             QPushButton* m_resetButton{nullptr};
+            QPushButton* m_stepButton{nullptr};
             QPushButton* m_toggleViewButton{nullptr};
-            QCheckBox*   m_gridToggle{nullptr};
-            QComboBox*   m_neighbourhoodCombo{nullptr};
+
+            QSlider*   m_simulationSpeedSlider{nullptr};
+            QCheckBox* m_gridToggle{nullptr};
+            QComboBox* m_neighbourhoodCombo{nullptr};
 
             QElapsedTimer m_fpsTimer;
             int           m_fpsFrameCount{0};
@@ -72,6 +75,7 @@ namespace app::ui
             void buildUi();
             void buildLayout();
             void wire();
+            void updateIterationLabel();
             void setupStats();
             void updateStats(int globalStep);
             void clearStats();
@@ -82,6 +86,7 @@ namespace app::ui
             void onStep();
             void onStartButtonClicked();
             void onResetButtonClicked();
+            void onStepButtonClicked();
             void onToggleView(bool checked);
             void onNeighbourhoodChanged(int index);
     };

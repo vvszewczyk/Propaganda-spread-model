@@ -12,6 +12,8 @@ class Simulation
         void setPools(const Pools&);
         void setNeighbourhoodType(NeighbourhoodType type);
 
+        [[nodiscard]] int getIteration() const;
+
         void seedRandomly(int countA, int countB);
         void reset();
 
@@ -26,6 +28,7 @@ class Simulation
         int                   m_rows;
         std::vector<CellData> m_currentGrid;
         std::vector<CellData> m_nextGrid;
+        int                   m_iteration{0};
 
         BaseParameters    m_parameters{};
         Player            m_playerA{};

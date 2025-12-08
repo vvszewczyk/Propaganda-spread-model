@@ -2,6 +2,7 @@
 
 #include <qlabel.h>
 #include <qnamespace.h>
+#include <qpushbutton.h>
 #include <qstringliteral.h>
 #include <qtypes.h>
 
@@ -39,7 +40,7 @@ void MainWindow::buildUi()
     }
     m_gridWidget->setUsMap(m_usMap.get());
 
-    m_simulationLabel    = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationSettings);
+    m_simulationLabel    = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationControl);
     m_iterationLabel     = makeWidget<QLabel>(this, nullptr, Config::UiText::iterationPrefix + "0");
     m_neighbourhoodLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::neighbourhood);
     m_cellInfoLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::cellInfoPrefix + "N/A");
@@ -48,6 +49,7 @@ void MainWindow::buildUi()
 
     m_startButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::start);
     m_resetButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::reset);
+    m_stepButton       = makeWidget<QPushButton>(this, nullptr, Config::UiText::step);
     m_toggleViewButton = makeWidget<QPushButton>(
         this, [](auto* b) { b->setCheckable(true); }, Config::UiText::showStats);
 
@@ -55,6 +57,7 @@ void MainWindow::buildUi()
         this, [](auto* c) { c->setChecked(false); }, Config::UiText::showGrid);
     m_neighbourhoodCombo = makeWidget<QComboBox>(
         this, [](auto* c) { c->addItems({Config::UiText::vonNeumann, Config::UiText::moore}); });
+    m_simulationSpeedSlider = makeWidget<QSlider>(this, /*TODO*/ nullptr, Qt::Horizontal);
 }
 
 void MainWindow::buildLayout()
@@ -78,18 +81,27 @@ void MainWindow::buildLayout()
     mainLayout->addWidget(left, Config::Layout::leftPanelStretch);
 
     auto* right = new QWidget(centralWidget);
-    // right->setStyleSheet(Config::rightBlockColor);
+    // right->setStyleSheet(Config::Colors::rightBlockColor);
     auto* rightLayout = new QVBoxLayout(right);
+    m_simulationLabel->setStyleSheet("font-weight: bold;");
     rightLayout->addWidget(m_simulationLabel);
 
     // Start/pause and reset buttons
     auto* rowButtons = new QHBoxLayout();
+    QSize buttonSize(Config::Layout::buttonWidth, Config::Layout::buttonHeight);
     rowButtons->addStretch();
+    m_startButton->setFixedSize(buttonSize);
     rowButtons->addWidget(m_startButton);
     rowButtons->addSpacing(Config::Layout::rowButtonsSpacing); // Space between buttons
+    m_resetButton->setFixedSize(buttonSize);
     rowButtons->addWidget(m_resetButton);
+    rowButtons->addSpacing(Config::Layout::rowButtonsSpacing); // Space between buttons
+    m_stepButton->setFixedSize(buttonSize);
+    rowButtons->addWidget(m_stepButton);
     rowButtons->addStretch();
     rightLayout->addLayout(rowButtons);
+
+    rightLayout->addWidget(m_simulationSpeedSlider);
 
     // Neighbourhood combobox
     rightLayout->addWidget(m_neighbourhoodLabel);
@@ -139,6 +151,7 @@ void MainWindow::wire()
 {
     connect(m_startButton, SIGNAL(clicked()), this, SLOT(onStartButtonClicked()));
     connect(m_resetButton, SIGNAL(clicked()), this, SLOT(onResetButtonClicked()));
+    connect(m_stepButton, SIGNAL(clicked()), this, SLOT(onStepButtonClicked()));
     connect(m_gridToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setShowGrid);
     connect(m_toggleViewButton, SIGNAL(toggled(bool)), this, SLOT(onToggleView(bool)));
     connect(m_timer.get(), SIGNAL(timeout()), this, SLOT(onStep()));
@@ -169,6 +182,11 @@ void MainWindow::wire()
             });
 }
 
+void MainWindow::updateIterationLabel()
+{
+    m_iterationLabel->setText(QStringLiteral("Iteration: %1").arg(m_simulation->getIteration()));
+}
+
 void MainWindow::countFps()
 {
     ++m_fpsFrameCount;
@@ -190,6 +208,7 @@ void MainWindow::onStep()
 
     m_simulation->step();
     m_gridWidget->update();
+    updateIterationLabel();
 
     if (m_contentStack->currentIndex() == 1)
     {
@@ -220,6 +239,7 @@ void MainWindow::onStartButtonClicked()
 void MainWindow::onResetButtonClicked()
 {
     m_timer->stop();
+    m_simulation->reset();
     m_fpsLabel->setText(QStringLiteral("FPS: 0"));
     updateOverlayLabelsPosition();
 
@@ -232,6 +252,23 @@ void MainWindow::onResetButtonClicked()
 
     clearStats();
     m_iterationLabel->setText(QStringLiteral("Iteration: 0"));
+}
+
+void MainWindow::onStepButtonClicked()
+{
+    if (m_timer->isActive())
+    {
+        m_timer->stop();
+        m_startButton->setText("Start");
+        m_fpsLabel->setText(QStringLiteral("FPS: 0"));
+        updateOverlayLabelsPosition();
+    }
+    else
+    {
+        onStep();
+        m_fpsLabel->setText(QStringLiteral("FPS: 0"));
+        updateOverlayLabelsPosition();
+    }
 }
 
 void MainWindow::onToggleView(bool checked)

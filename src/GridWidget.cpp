@@ -62,6 +62,7 @@ void GridWidget::resetView() noexcept
     m_zoom = 1.0;
     m_pan  = QPointF{0.0, 0.0};
     emit zoomChanged(m_zoom);
+    emit cellInfoChanged(QString());
     update();
 }
 
@@ -596,7 +597,6 @@ void GridWidget::leaveEvent(QEvent* event)
     Q_UNUSED(event)
     m_hoverSid = -1;
     QToolTip::hideText();
-    emit cellInfoChanged(QString());
 }
 
 void GridWidget::wheelEvent(QWheelEvent* event)

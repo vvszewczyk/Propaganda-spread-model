@@ -6,7 +6,8 @@ Simulation::Simulation(int cols, int rows)
     : m_cols{cols},
       m_rows{rows},
       m_currentGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
-      m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)}
+      m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
+      m_iteration{0}
 {
 }
 
@@ -31,6 +32,11 @@ void Simulation::setNeighbourhoodType(NeighbourhoodType type)
     m_neighbourhoodType = type;
 }
 
+int Simulation::getIteration() const
+{
+    return m_iteration;
+}
+
 void Simulation::seedRandomly(int countA, int countB) {};
 
 void Simulation::reset()
@@ -39,10 +45,12 @@ void Simulation::reset()
         std::vector<CellData>(static_cast<std::size_t>(m_cols) * static_cast<std::size_t>(m_rows));
     m_nextGrid =
         std::vector<CellData>(static_cast<std::size_t>(m_cols) * static_cast<std::size_t>(m_rows));
+    m_iteration = 0;
 }
 
 void Simulation::step()
 {
+    ++m_iteration;
 }
 
 int Simulation::getCols() const

@@ -26,28 +26,29 @@ namespace Config
     {
         inline constexpr int margin            = 5;
         inline constexpr int mainMargin        = 0;
-        inline constexpr int rowButtonsSpacing = 6;
+        inline constexpr int rowButtonsSpacing = 1;
         inline constexpr int leftPanelStretch  = 7;
         inline constexpr int rightPanelStretch = 1;
         inline constexpr int buttonWidth       = 50;
-        inline constexpr int buttonHeight      = 20;
+        inline constexpr int buttonHeight      = 25;
     } // namespace Layout
 
     namespace UiText
     {
-        inline const QString simulationSettings = QStringLiteral("Simulation settings");
-        inline const QString iterationPrefix    = QStringLiteral("Iteration: ");
-        inline const QString start              = QStringLiteral("Start");
-        inline const QString reset              = QStringLiteral("Reset");
-        inline const QString showStats          = QStringLiteral("Show stats");
-        inline const QString showSimulation     = QStringLiteral("Show simulation");
-        inline const QString showGrid           = QStringLiteral("Show grid");
-        inline const QString neighbourhood      = QStringLiteral("Neighbourhood");
-        inline const QString vonNeumann         = QStringLiteral("Von Neumann");
-        inline const QString moore              = QStringLiteral("Moore");
-        inline const QString zoom               = QStringLiteral("Zoom: ");
-        inline const QString fps                = QStringLiteral("FPS: ");
-        inline const QString cellInfoPrefix     = QStringLiteral("Cell: ");
+        inline const QString simulationControl = QStringLiteral("Simulation control");
+        inline const QString iterationPrefix   = QStringLiteral("Iteration: ");
+        inline const QString start             = QStringLiteral("Start");
+        inline const QString reset             = QStringLiteral("Reset");
+        inline const QString step              = QStringLiteral("Step");
+        inline const QString showStats         = QStringLiteral("Show stats");
+        inline const QString showSimulation    = QStringLiteral("Show simulation");
+        inline const QString showGrid          = QStringLiteral("Show grid");
+        inline const QString neighbourhood     = QStringLiteral("Neighbourhood");
+        inline const QString vonNeumann        = QStringLiteral("Von Neumann");
+        inline const QString moore             = QStringLiteral("Moore");
+        inline const QString zoom              = QStringLiteral("Zoom: ");
+        inline const QString fps               = QStringLiteral("FPS: ");
+        inline const QString cellInfoPrefix    = QStringLiteral("Cell: ");
     } // namespace UiText
 
     namespace Colors
