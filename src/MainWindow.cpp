@@ -1,10 +1,10 @@
 #include "MainWindow.hpp"
 
-#include <qlabel.h>
-#include <qnamespace.h>
-#include <qpushbutton.h>
-#include <qstringliteral.h>
-#include <qtypes.h>
+#include <QBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QSlider>
+#include <QStringLiteral>
 
 using namespace app::ui;
 
@@ -57,7 +57,19 @@ void MainWindow::buildUi()
         this, [](auto* c) { c->setChecked(false); }, Config::UiText::showGrid);
     m_neighbourhoodCombo = makeWidget<QComboBox>(
         this, [](auto* c) { c->addItems({Config::UiText::vonNeumann, Config::UiText::moore}); });
-    m_simulationSpeedSlider = makeWidget<QSlider>(this, /*TODO*/ nullptr, Qt::Horizontal);
+
+    m_simulationSpeedLabel  = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationSpeed);
+    m_simulationSpeedSlider = makeWidget<QSlider>(
+        this,
+        [](QSlider* slider)
+        {
+            slider->setRange(0, 100);
+            slider->setValue(Config::Timing::simulationSpeed);
+        },
+        Qt::Horizontal);
+
+    m_slowerLabel = makeWidget<QLabel>(this, nullptr, QStringLiteral("-"));
+    m_fasterLabel = makeWidget<QLabel>(this, nullptr, QStringLiteral("+"));
 }
 
 void MainWindow::buildLayout()
@@ -83,7 +95,7 @@ void MainWindow::buildLayout()
     auto* right = new QWidget(centralWidget);
     // right->setStyleSheet(Config::Colors::rightBlockColor);
     auto* rightLayout = new QVBoxLayout(right);
-    m_simulationLabel->setStyleSheet("font-weight: bold;");
+    m_simulationLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
     rightLayout->addWidget(m_simulationLabel);
 
     // Start/pause and reset buttons
@@ -101,7 +113,18 @@ void MainWindow::buildLayout()
     rowButtons->addStretch();
     rightLayout->addLayout(rowButtons);
 
-    rightLayout->addWidget(m_simulationSpeedSlider);
+    // Simulation speed slider
+    rightLayout->addWidget(m_simulationSpeedLabel);
+    auto* speedControlLayout = new QHBoxLayout();
+    speedControlLayout->setContentsMargins(0, 0, 0, 0);
+    m_slowerLabel->setAlignment(Qt::AlignCenter);
+    m_slowerLabel->setStyleSheet("font-size: 11pt;");
+    m_fasterLabel->setAlignment(Qt::AlignCenter);
+    m_fasterLabel->setStyleSheet("font-size: 11pt;");
+    speedControlLayout->addWidget(m_slowerLabel);
+    speedControlLayout->addWidget(m_simulationSpeedSlider);
+    speedControlLayout->addWidget(m_fasterLabel);
+    rightLayout->addLayout(speedControlLayout);
 
     // Neighbourhood combobox
     rightLayout->addWidget(m_neighbourhoodLabel);
@@ -149,14 +172,16 @@ void MainWindow::buildLayout()
 
 void MainWindow::wire()
 {
-    connect(m_startButton, SIGNAL(clicked()), this, SLOT(onStartButtonClicked()));
-    connect(m_resetButton, SIGNAL(clicked()), this, SLOT(onResetButtonClicked()));
-    connect(m_stepButton, SIGNAL(clicked()), this, SLOT(onStepButtonClicked()));
+    connect(m_startButton, &QPushButton::clicked, this, &MainWindow::onStartButtonClicked);
+    connect(m_resetButton, &QPushButton::clicked, this, &MainWindow::onResetButtonClicked);
+    connect(m_stepButton, &QPushButton::clicked, this, &MainWindow::onStepButtonClicked);
+    connect(m_simulationSpeedSlider, &QSlider::valueChanged, this,
+            &MainWindow::onSimulationSpeedChanged);
     connect(m_gridToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setShowGrid);
-    connect(m_toggleViewButton, SIGNAL(toggled(bool)), this, SLOT(onToggleView(bool)));
-    connect(m_timer.get(), SIGNAL(timeout()), this, SLOT(onStep()));
-    connect(m_neighbourhoodCombo, SIGNAL(currentIndexChanged(int)), this,
-            SLOT(onNeighbourhoodChanged(int)));
+    connect(m_toggleViewButton, &QPushButton::toggled, this, &MainWindow::onToggleView);
+    connect(m_timer.get(), &QTimer::timeout, this, &MainWindow::onStep);
+    connect(m_neighbourhoodCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &MainWindow::onNeighbourhoodChanged);
     connect(m_gridWidget, &GridWidget::zoomChanged, this,
             [this](double zoomFactor)
             {
@@ -231,7 +256,8 @@ void MainWindow::onStartButtonClicked()
         m_fpsFrameCount = 0;
         m_fpsTimer.restart();
 
-        m_timer->start(Config::Timing::simulationStepMs);
+        onSimulationSpeedChanged(m_simulationSpeedSlider->value());
+        m_timer->start();
         m_startButton->setText(QStringLiteral("Pause"));
     }
 }
@@ -244,8 +270,7 @@ void MainWindow::onResetButtonClicked()
     updateOverlayLabelsPosition();
 
     m_startButton->setText(QStringLiteral("Start"));
-    m_simulation->reset();
-
+    m_simulationSpeedSlider->setValue(Config::Timing::simulationSpeed);
     m_gridWidget->clearMap();
     m_gridWidget->resetView();
     m_gridWidget->update();
@@ -283,6 +308,17 @@ void MainWindow::onNeighbourhoodChanged(int index)
     auto chosenNeighbourhoodType =
         (index == 0) ? NeighbourhoodType::MOORE : NeighbourhoodType::VON_NEUMANN;
     m_simulation->setNeighbourhoodType(chosenNeighbourhoodType);
+}
+
+void MainWindow::onSimulationSpeedChanged(int speed)
+{
+    const int slowInterval = 1000;
+    const int fastInterval = 16;
+
+    float t           = static_cast<float>(speed) / 100.0f;
+    int   newInterval = static_cast<int>(slowInterval + t * (fastInterval - slowInterval));
+
+    m_timer->setInterval(newInterval);
 }
 
 void MainWindow::setupStats()

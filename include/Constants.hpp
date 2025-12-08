@@ -43,12 +43,13 @@ namespace Config
         inline const QString showStats         = QStringLiteral("Show stats");
         inline const QString showSimulation    = QStringLiteral("Show simulation");
         inline const QString showGrid          = QStringLiteral("Show grid");
-        inline const QString neighbourhood     = QStringLiteral("Neighbourhood");
+        inline const QString neighbourhood     = QStringLiteral("Neighbourhood:");
         inline const QString vonNeumann        = QStringLiteral("Von Neumann");
         inline const QString moore             = QStringLiteral("Moore");
         inline const QString zoom              = QStringLiteral("Zoom: ");
         inline const QString fps               = QStringLiteral("FPS: ");
         inline const QString cellInfoPrefix    = QStringLiteral("Cell: ");
+        inline const QString simulationSpeed   = QStringLiteral("Simulation speed:");
     } // namespace UiText
 
     namespace Colors
@@ -60,7 +61,7 @@ namespace Config
 
     namespace Timing
     {
-        inline constexpr int simulationStepMs = 16;
+        inline constexpr int simulationSpeed = 50;
     } // namespace Timing
 
     namespace Map

@@ -65,7 +65,11 @@ namespace app::ui
             QPushButton* m_stepButton{nullptr};
             QPushButton* m_toggleViewButton{nullptr};
 
-            QSlider*   m_simulationSpeedSlider{nullptr};
+            QLabel*  m_simulationSpeedLabel{nullptr};
+            QSlider* m_simulationSpeedSlider{nullptr};
+            QLabel*  m_slowerLabel{nullptr};
+            QLabel*  m_fasterLabel{nullptr};
+
             QCheckBox* m_gridToggle{nullptr};
             QComboBox* m_neighbourhoodCombo{nullptr};
 
@@ -89,5 +93,6 @@ namespace app::ui
             void onStepButtonClicked();
             void onToggleView(bool checked);
             void onNeighbourhoodChanged(int index);
+            void onSimulationSpeedChanged(int speed);
     };
 } // namespace app::ui
