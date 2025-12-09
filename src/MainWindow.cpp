@@ -5,6 +5,10 @@
 #include <QPushButton>
 #include <QSlider>
 #include <QStringLiteral>
+#include <qcombobox.h>
+#include <qlabel.h>
+#include <qnamespace.h>
+#include <qspinbox.h>
 
 using namespace app::ui;
 
@@ -40,23 +44,10 @@ void MainWindow::buildUi()
     }
     m_gridWidget->setUsMap(m_usMap.get());
 
-    m_simulationLabel    = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationControl);
-    m_iterationLabel     = makeWidget<QLabel>(this, nullptr, Config::UiText::iterationPrefix + "0");
-    m_neighbourhoodLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::neighbourhood);
-    m_cellInfoLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::cellInfoPrefix + "N/A");
-    m_zoomLabel     = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::zoom + "100%");
-    m_fpsLabel      = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::fps + "0");
-
-    m_startButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::start);
-    m_resetButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::reset);
-    m_stepButton       = makeWidget<QPushButton>(this, nullptr, Config::UiText::step);
-    m_toggleViewButton = makeWidget<QPushButton>(
-        this, [](auto* b) { b->setCheckable(true); }, Config::UiText::showStats);
-
-    m_gridToggle = makeWidget<QCheckBox>(
-        this, [](auto* c) { c->setChecked(false); }, Config::UiText::showGrid);
-    m_neighbourhoodCombo = makeWidget<QComboBox>(
-        this, [](auto* c) { c->addItems({Config::UiText::vonNeumann, Config::UiText::moore}); });
+    m_simulationLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationControl);
+    m_startButton     = makeWidget<QPushButton>(this, nullptr, Config::UiText::start);
+    m_resetButton     = makeWidget<QPushButton>(this, nullptr, Config::UiText::reset);
+    m_stepButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::step);
 
     m_simulationSpeedLabel  = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationSpeed);
     m_simulationSpeedSlider = makeWidget<QSlider>(
@@ -67,9 +58,58 @@ void MainWindow::buildUi()
             slider->setValue(Config::Timing::simulationSpeed);
         },
         Qt::Horizontal);
+    m_slowerLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::slower);
+    m_fasterLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::faster);
 
-    m_slowerLabel = makeWidget<QLabel>(this, nullptr, QStringLiteral("-"));
-    m_fasterLabel = makeWidget<QLabel>(this, nullptr, QStringLiteral("+"));
+    m_neighbourhoodLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::neighbourhood);
+    m_neighbourhoodCombo = makeWidget<QComboBox>(
+        this, [](auto* comboBox)
+        { comboBox->addItems({Config::UiText::vonNeumann, Config::UiText::moore}); });
+
+    m_scenarioPresetLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::scenarioPreset);
+    m_scenarioPresetCombo = makeWidget<QComboBox>(
+        this, [](auto* comboBox) { comboBox->addItems({Config::UiText::scenario1}); });
+
+    m_modelParametersLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::modelParameters);
+    m_betaLabel            = makeWidget<QLabel>(this, nullptr, Config::UiText::beta);
+    m_betaSpin             = makeWidget<QDoubleSpinBox>(this,
+                                                        [](QDoubleSpinBox* spin)
+                                                        {
+                                                spin->setRange(Config::UiValues::minSpin,
+                                                                           Config::UiValues::maxSpin);
+                                                spin->setSingleStep(Config::UiValues::stepSpin);
+                                                spin->setValue(Config::UiValues::defaultSpin);
+                                            });
+    m_gammaLabel           = makeWidget<QLabel>(this, nullptr, Config::UiText::gamma);
+    m_gammaSpin            = makeWidget<QDoubleSpinBox>(this,
+                                                        [](QDoubleSpinBox* spin)
+                                                        {
+                                                 spin->setRange(Config::UiValues::minSpin,
+                                                                           Config::UiValues::maxSpin);
+                                                 spin->setSingleStep(Config::UiValues::stepSpin);
+                                                 spin->setValue(Config::UiValues::defaultSpin);
+                                             });
+    m_deltaLabel           = makeWidget<QLabel>(this, nullptr, Config::UiText::delta);
+    m_deltaSpin            = makeWidget<QDoubleSpinBox>(this,
+                                                        [](QDoubleSpinBox* spin)
+                                                        {
+                                                 spin->setRange(Config::UiValues::minSpin,
+                                                                           Config::UiValues::maxSpin);
+                                                 spin->setSingleStep(Config::UiValues::stepSpin);
+                                                 spin->setValue(Config::UiValues::defaultSpin);
+                                             });
+
+    m_gridToggle = makeWidget<QCheckBox>(
+        this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::showGrid);
+
+    m_cellInfoLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::cellInfoPrefix + "N/A");
+    m_zoomLabel     = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::zoom + "100%");
+    m_fpsLabel      = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::fps + "0");
+
+    m_toggleViewButton = makeWidget<QPushButton>(
+        this, [](auto* button) { button->setCheckable(true); }, Config::UiText::showStats);
+
+    m_iterationLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::iterationPrefix + "0");
 }
 
 void MainWindow::buildLayout()
@@ -126,9 +166,13 @@ void MainWindow::buildLayout()
     speedControlLayout->addWidget(m_fasterLabel);
     rightLayout->addLayout(speedControlLayout);
 
-    // Neighbourhood combobox
+    // Neighbourhood comboBox
     rightLayout->addWidget(m_neighbourhoodLabel);
     rightLayout->addWidget(m_neighbourhoodCombo);
+
+    // Scenario preset comboBox
+    rightLayout->addWidget(m_scenarioPresetLabel);
+    rightLayout->addWidget(m_scenarioPresetCombo);
 
     // Checkboxes
     auto* rowChecks = new QHBoxLayout();
@@ -136,6 +180,37 @@ void MainWindow::buildLayout()
     rowChecks->addWidget(m_gridToggle);
     rowChecks->addStretch(); // Push checkbox up
     rightLayout->addLayout(rowChecks);
+
+    m_modelParametersLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
+    rightLayout->addWidget(m_modelParametersLabel);
+    auto* rowSpinSection = new QHBoxLayout();
+    rowSpinSection->addStretch();
+    QSize spinBoxSize(Config::Layout::buttonWidth, Config::Layout::buttonHeight);
+    auto* betaGroup = new QVBoxLayout();
+    betaGroup->setSpacing(0);
+    m_betaSpin->setFixedSize(spinBoxSize);
+    m_betaLabel->setAlignment(Qt::AlignCenter);
+    betaGroup->addWidget(m_betaSpin);
+    betaGroup->addWidget(m_betaLabel);
+    rowSpinSection->addLayout(betaGroup);
+    rowSpinSection->addSpacing(Config::Layout::rowButtonsSpacing);
+    auto* gammaGroup = new QVBoxLayout();
+    gammaGroup->setSpacing(0);
+    m_gammaSpin->setFixedSize(spinBoxSize);
+    m_gammaLabel->setAlignment(Qt::AlignCenter);
+    gammaGroup->addWidget(m_gammaSpin);
+    gammaGroup->addWidget(m_gammaLabel);
+    rowSpinSection->addLayout(gammaGroup);
+    rowSpinSection->addSpacing(Config::Layout::rowButtonsSpacing);
+    auto* deltaGroup = new QVBoxLayout();
+    deltaGroup->setSpacing(0);
+    m_deltaSpin->setFixedSize(spinBoxSize);
+    m_deltaLabel->setAlignment(Qt::AlignCenter);
+    deltaGroup->addWidget(m_deltaSpin);
+    deltaGroup->addWidget(m_deltaLabel);
+    rowSpinSection->addLayout(deltaGroup);
+    rowSpinSection->addStretch();
+    rightLayout->addLayout(rowSpinSection);
 
     rightLayout->addStretch();
 
@@ -271,6 +346,9 @@ void MainWindow::onResetButtonClicked()
 
     m_startButton->setText(QStringLiteral("Start"));
     m_simulationSpeedSlider->setValue(Config::Timing::simulationSpeed);
+    m_betaSpin->setValue(Config::UiValues::defaultSpin);
+    m_gammaSpin->setValue(Config::UiValues::defaultSpin);
+    m_deltaSpin->setValue(Config::UiValues::defaultSpin);
     m_gridWidget->clearMap();
     m_gridWidget->resetView();
     m_gridWidget->update();

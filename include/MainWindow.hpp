@@ -5,14 +5,16 @@
 #include "UsMap.hpp"
 
 #include <QDebug>
+#include <QElapsedTimer>
+#include <QLabel>
 #include <QStringLiteral>
 #include <QStringView>
 #include <QTimer>
 #include <QtWidgets>
 #include <cstddef>
 #include <memory>
-#include <qelapsedtimer.h>
-#include <qlabel.h>
+#include <qcombobox.h>
+#include <qspinbox.h>
 #include <type_traits>
 // #include <QtCharts>
 // #include <QtWidgets/QMainWindow>
@@ -53,25 +55,40 @@ namespace app::ui
             GridWidget*     m_gridWidget{nullptr};
             QWidget*        m_statsWidget{nullptr};
 
-            QLabel* m_simulationLabel{nullptr};
-            QLabel* m_iterationLabel{nullptr};
-            QLabel* m_neighbourhoodLabel{nullptr};
             QLabel* m_zoomLabel{nullptr};
             QLabel* m_fpsLabel{nullptr};
-            QLabel* m_cellInfoLabel{nullptr};
 
+            QLabel*      m_simulationLabel{nullptr};
             QPushButton* m_startButton{nullptr};
             QPushButton* m_resetButton{nullptr};
             QPushButton* m_stepButton{nullptr};
-            QPushButton* m_toggleViewButton{nullptr};
 
             QLabel*  m_simulationSpeedLabel{nullptr};
             QSlider* m_simulationSpeedSlider{nullptr};
             QLabel*  m_slowerLabel{nullptr};
             QLabel*  m_fasterLabel{nullptr};
 
-            QCheckBox* m_gridToggle{nullptr};
+            QLabel*    m_neighbourhoodLabel{nullptr};
             QComboBox* m_neighbourhoodCombo{nullptr};
+
+            QLabel*    m_scenarioPresetLabel{nullptr};
+            QComboBox* m_scenarioPresetCombo{nullptr};
+
+            QLabel* m_modelParametersLabel{nullptr};
+
+            QLabel*         m_betaLabel{nullptr};
+            QDoubleSpinBox* m_betaSpin{nullptr};
+            QLabel*         m_gammaLabel{nullptr};
+            QDoubleSpinBox* m_gammaSpin{nullptr};
+            QLabel*         m_deltaLabel{nullptr};
+            QDoubleSpinBox* m_deltaSpin{nullptr};
+
+            QCheckBox* m_gridToggle{nullptr};
+
+            QLabel*      m_cellInfoLabel{nullptr};
+            QPushButton* m_toggleViewButton{nullptr};
+
+            QLabel* m_iterationLabel{nullptr};
 
             QElapsedTimer m_fpsTimer;
             int           m_fpsFrameCount{0};

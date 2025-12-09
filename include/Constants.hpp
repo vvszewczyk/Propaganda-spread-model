@@ -1,7 +1,7 @@
 
 #include <QColor>
-#include <qstringliteral.h>
-#include <qvectornd.h>
+#include <QStringLiteral>
+#include <QVector3D>
 
 namespace Config
 {
@@ -13,7 +13,6 @@ namespace Config
         extern int cellSize;
         extern int gridCols;
         extern int gridRows;
-        extern int gridDepth;
     } // namespace Grid
 
     namespace Window
@@ -50,7 +49,25 @@ namespace Config
         inline const QString fps               = QStringLiteral("FPS: ");
         inline const QString cellInfoPrefix    = QStringLiteral("Cell: ");
         inline const QString simulationSpeed   = QStringLiteral("Simulation speed:");
+        inline const QString slower            = QStringLiteral("-");
+        inline const QString faster            = QStringLiteral("+");
+        inline const QString scenarioPreset    = QStringLiteral("Scenario preset:");
+        inline const QString scenario1         = QStringLiteral("Scenario 1");
+        inline const QString modelParameters   = QStringLiteral("Model parameters");
+        inline const QString beta              = QStringLiteral("β₀");
+        inline const QString gamma             = QStringLiteral("γ₀");
+        inline const QString delta             = QStringLiteral("δ₀");
+
     } // namespace UiText
+
+    namespace UiValues
+    {
+        inline constexpr double minSpin     = 0.0;
+        inline constexpr double maxSpin     = 1.0;
+        inline constexpr double stepSpin    = 0.01;
+        inline constexpr double defaultSpin = 0.5;
+
+    } // namespace UiValues
 
     namespace Colors
     {

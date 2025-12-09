@@ -6,22 +6,20 @@
 
 #include <QColor>
 #include <QCursor>
+#include <QObject>
 #include <QPainter>
 #include <QPoint>
 #include <QStringLiteral>
+#include <QStringView>
 #include <QTimer>
 #include <QToolTip>
 #include <QWheelEvent>
 #include <QWidget>
+#include <Qt>
+#include <QtGlobal>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <qnamespace.h>
-#include <qobject.h>
-#include <qpoint.h>
-#include <qstringview.h>
-#include <qtypes.h>
-#include <sys/stat.h>
 
 using namespace app::ui;
 

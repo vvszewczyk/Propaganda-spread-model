@@ -10,8 +10,8 @@
 #include <QRectF>
 #include <QSize>
 #include <QString>
-#include <QStringview>
-#include <QSvgrenderer>
+#include <QStringView>
+#include <QSvgRenderer>
 #include <cstdint>
 #include <optional>
 #include <vector>

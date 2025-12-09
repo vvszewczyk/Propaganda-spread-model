@@ -19,7 +19,7 @@ add_executable(PropagandaSpreadModel
   src/GridWidget.cpp
   src/Constants.cpp
   include/MainWindow.hpp
-  include/UsMap.hpp
+  #include/UsMap.hpp
   include/GridWidget.hpp
 )
 target_include_directories(PropagandaSpreadModel PRIVATE ${CMAKE_SOURCE_DIR}/include)

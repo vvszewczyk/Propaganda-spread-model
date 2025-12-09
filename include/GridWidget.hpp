@@ -4,14 +4,13 @@
 #include "Types.hpp"
 #include "UsMap.hpp"
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QPoint>
 #include <QWidget>
 #include <cstdint>
-#include <qelapsedtimer.h>
-#include <qpainter.h>
-#include <qpoint.h>
 
 namespace app::ui
 {
