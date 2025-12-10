@@ -8,6 +8,7 @@
 #include <qcombobox.h>
 #include <qlabel.h>
 #include <qnamespace.h>
+#include <qradiobutton.h>
 #include <qspinbox.h>
 
 using namespace app::ui;
@@ -101,6 +102,12 @@ void MainWindow::buildUi()
 
     m_gridToggle = makeWidget<QCheckBox>(
         this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::showGrid);
+
+    m_playerSettingsLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::playerSettings);
+    m_sideARadio          = makeWidget<QRadioButton>(
+        this, [](auto* radio) { radio->setChecked(true); }, Config::UiText::playerA);
+    m_sideBRadio  = makeWidget<QRadioButton>(this, nullptr, Config::UiText::playerB);
+    m_budgetLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::budget + "N/A");
 
     m_cellInfoLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::cellInfoPrefix + "N/A");
     m_zoomLabel     = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::zoom + "100%");
@@ -211,6 +218,18 @@ void MainWindow::buildLayout()
     rowSpinSection->addLayout(deltaGroup);
     rowSpinSection->addStretch();
     rightLayout->addLayout(rowSpinSection);
+
+    // Player settings
+    m_playerSettingsLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
+    rightLayout->addWidget(m_playerSettingsLabel);
+    auto* playerRadioLayout = new QHBoxLayout();
+    playerRadioLayout->addStretch();
+    playerRadioLayout->addWidget(m_sideARadio);
+    playerRadioLayout->addSpacing(Config::Layout::rowButtonsSpacing * 2);
+    playerRadioLayout->addWidget(m_sideBRadio);
+    playerRadioLayout->addStretch();
+    rightLayout->addLayout(playerRadioLayout);
+    rightLayout->addWidget(m_budgetLabel);
 
     rightLayout->addStretch();
 

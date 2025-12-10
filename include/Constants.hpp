@@ -57,6 +57,10 @@ namespace Config
         inline const QString beta              = QStringLiteral("β₀");
         inline const QString gamma             = QStringLiteral("γ₀");
         inline const QString delta             = QStringLiteral("δ₀");
+        inline const QString playerSettings    = QStringLiteral("Player Settings");
+        inline const QString playerA           = QStringLiteral("Player A");
+        inline const QString playerB           = QStringLiteral("Player B");
+        inline const QString budget            = QStringLiteral("Budget: ");
 
     } // namespace UiText
 

@@ -28,7 +28,7 @@ struct BaseParameters
               delta0     = 0.0f; // współczynniki tego jak łatwo przejść między stanami
         float sBroadcast = 0.0f, sSocial = 0.0f,
               sDM = 0.0f; // wagi ile "warte" są poszczególne kanały (Broadcast, Social, DM) w
-                          // obliczaniu ekspozycji
+                          // obliczaniu ekspozycji, jak bardzo społeczeństwo ufa danemu medium
         float wLocal =
             0.0f; // waga lokalnych sąsiadów (ile "warci" są sąsiedzi w danym sąsiedztwie)
 };
@@ -43,7 +43,7 @@ struct Controls
 struct Player
 {
         Controls controls; // "pokrętła" jak mocno dana strona używa danego kanału/koloru propagandy
-                           // w danym kroku
+                           // w danym kroku, inaczej intensywność sygnału
         float  budget    = 0.0f; // budżet jaki gracz może przeznaczyć na kampanię
         double costWhite = 1.0, costGrey = 2.0, costBlack = 3.0; // ceny jednostek danej propagandy
 };

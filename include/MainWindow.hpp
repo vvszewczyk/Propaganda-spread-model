@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <memory>
 #include <qcombobox.h>
+#include <qradiobutton.h>
 #include <qspinbox.h>
 #include <type_traits>
 // #include <QtCharts>
@@ -82,6 +83,12 @@ namespace app::ui
             QDoubleSpinBox* m_gammaSpin{nullptr};
             QLabel*         m_deltaLabel{nullptr};
             QDoubleSpinBox* m_deltaSpin{nullptr};
+
+            // TODO: Apply button
+            QLabel*       m_playerSettingsLabel{nullptr};
+            QRadioButton* m_sideARadio{nullptr};
+            QRadioButton* m_sideBRadio{nullptr};
+            QLabel*       m_budgetLabel{nullptr};
 
             QCheckBox* m_gridToggle{nullptr};
 
