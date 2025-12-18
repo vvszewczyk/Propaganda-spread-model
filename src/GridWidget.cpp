@@ -45,6 +45,21 @@ void GridWidget::setShowGrid(bool on) noexcept
     update();
 }
 
+void GridWidget::setMapMode(bool on) noexcept
+{
+    this->m_mapMode = on;
+
+    if (not m_mapMode)
+    {
+        m_coloredCells.clear();
+        m_coloredStates.clear();
+        m_selectedStateIds.clear();
+        m_selectedSingleStateId = -1;
+        m_hoverSid              = -1;
+    }
+    update();
+}
+
 void GridWidget::clearMap() noexcept
 {
     m_coloredCells.clear();
@@ -164,21 +179,25 @@ void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
         return;
     }
 
-    const uint8_t sid = stateAtWidgetPos(pos);
-    if (sid == UsMap::kNoState)
-    {
-        return;
-    }
-
     const QPoint cell = productPointFromWidgetPos(pos);
     if (cell.x() < 0 || cell.y() < 0)
     {
         return;
     }
 
-    const int    stateId = static_cast<int>(sid);
     const QColor red(255, 0, 0);
     const QColor green(0, 255, 0);
+
+    int stateId = -1;
+    if (m_mapMode)
+    {
+        const uint8_t sid = stateAtWidgetPos(pos);
+        if (sid == UsMap::kNoState)
+        {
+            return;
+        }
+        stateId = sid;
+    }
 
     if (buttons & Qt::LeftButton)
     {
@@ -187,7 +206,14 @@ void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
 
     if (buttons & Qt::RightButton)
     {
-        m_coloredStates.insert(stateId, green);
+        if (m_mapMode)
+        {
+            m_coloredStates.insert(stateId, green);
+        }
+        else
+        {
+            m_coloredCells.insert(cell, green);
+        }
     }
 
     update();
@@ -201,13 +227,6 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
         return;
     }
 
-    const uint8_t stateId = stateAtWidgetPos(position);
-    if (stateId == UsMap::kNoState)
-    {
-        emit cellInfoChanged(QString());
-        return;
-    }
-
     const QPoint cell = productPointFromWidgetPos(position);
     if (cell.x() < 0 || cell.y() < 0)
     {
@@ -216,7 +235,8 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
     }
 
     const auto cellData = m_sim->cell(cell.x(), cell.y());
-    QString    stateStr;
+
+    QString stateStr;
     switch (cellData.state)
     {
     case State::S:
@@ -237,6 +257,26 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
     default:
         stateStr = QStringLiteral("?");
         break;
+    }
+
+    if (!m_mapMode)
+    {
+        const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\nResilience=%4\nFatigue=%5")
+                                 .arg(cell.x())
+                                 .arg(cell.y())
+                                 .arg(stateStr)
+                                 .arg(cellData.resilience, 0, 'f', 2)
+                                 .arg(cellData.fatigue, 0, 'f', 2);
+
+        emit cellInfoChanged(info);
+        return;
+    }
+
+    const uint8_t stateId = stateAtWidgetPos(position);
+    if (stateId == UsMap::kNoState)
+    {
+        emit cellInfoChanged(QString());
+        return;
     }
 
     const QString usState = tooltipTextForState(stateId);
@@ -310,13 +350,14 @@ void GridWidget::rebuildCellsImageIfNeeded() const
     }
 
     m_cellsImage.fill(Qt::transparent);
+    const bool useMask = m_mapMode;
 
     for (int y = 0; y < products.rows; ++y)
     {
         for (int x = 0; x < products.cols; ++x)
         {
             const int index = y * products.cols + x;
-            if (!products.activeStates[static_cast<std::size_t>(index)])
+            if (useMask && !products.activeStates[static_cast<std::size_t>(index)])
             {
                 continue;
             }
@@ -330,7 +371,7 @@ void GridWidget::rebuildCellsImageIfNeeded() const
             {
                 color = m_coloredCells.value(cellPoint);
             }
-            else if (m_coloredStates.contains(stateId))
+            else if (useMask && m_coloredStates.contains(stateId))
             {
                 color = m_coloredStates.value(stateId);
             }
@@ -465,7 +506,11 @@ void GridWidget::paintEvent(QPaintEvent*)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
 
     drawCells(painter, destRectF);
-    drawOutlines(painter, destRectF);
+
+    if (m_mapMode)
+    {
+        drawOutlines(painter, destRectF);
+    }
 
     if (m_showGrid)
     {
@@ -490,21 +535,47 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
         return;
     }
 
-    uint8_t sid = stateAtWidgetPos(event->pos());
-    if (sid == UsMap::kNoState)
-    {
-        return;
-    }
-
-    int          stateId = static_cast<int>(sid);
-    const QColor red(255, 0, 0);
-    const QColor green(0, 255, 0);
     const QPoint cell = productPointFromWidgetPos(event->pos());
-
     if (cell.x() < 0 || cell.y() < 0)
     {
         return;
     }
+
+    const QColor red(255, 0, 0);
+    const QColor green(0, 255, 0);
+
+    if (!m_mapMode)
+    {
+        if (event->button() == Qt::LeftButton)
+        {
+            if (m_coloredCells.contains(cell) && m_coloredCells.value(cell) == red)
+                m_coloredCells.remove(cell);
+            else
+                m_coloredCells.insert(cell, red);
+        }
+        else if (event->button() == Qt::RightButton)
+        {
+            if (m_coloredCells.contains(cell) && m_coloredCells.value(cell) == green)
+                m_coloredCells.remove(cell);
+            else
+                m_coloredCells.insert(cell, green);
+        }
+
+        const QString txt = QStringLiteral("Cell (%1, %2)").arg(cell.x()).arg(cell.y());
+        QToolTip::hideText();
+        QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
+                           Config::GridWidget::tooltopMs);
+
+        updateCellInfoAt(event->position());
+        update();
+        return event->accept();
+    }
+
+    uint8_t sid = stateAtWidgetPos(event->pos());
+    if (sid == UsMap::kNoState)
+        return;
+
+    int stateId = static_cast<int>(sid);
 
     if (event->button() == Qt::LeftButton)
     {
@@ -535,8 +606,10 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
     QToolTip::hideText();
     QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
                        Config::GridWidget::tooltopMs);
+
     updateCellInfoAt(event->position());
     update();
+    event->accept();
 }
 
 void GridWidget::mouseMoveEvent(QMouseEvent* event)
@@ -563,30 +636,35 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
         return;
     }
 
-    const uint8_t sid      = stateAtWidgetPos(event->pos());
-    const int     newHover = (sid == UsMap::kNoState) ? -1 : int(sid);
-
-    if (newHover == m_hoverSid)
+    if (!m_mapMode)
     {
-        updateCellInfoAt(event->position());
+        const QPoint cell     = productPointFromWidgetPos(event->pos());
+        const int    newHover = (cell.x() < 0 || cell.y() < 0)
+                                    ? -1
+                                    : (cell.y() * m_usMap->getProducts().cols + cell.x());
+
+        if (newHover == m_hoverSid)
+        {
+            updateCellInfoAt(event->position());
+            return;
+        }
+
+        m_hoverSid = newHover;
+
+        if (newHover != -1)
+        {
+            const QString txt = QStringLiteral("Cell (%1, %2)").arg(cell.x()).arg(cell.y());
+            QToolTip::hideText();
+            QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
+                               Config::GridWidget::tooltopMs);
+            updateCellInfoAt(event->position());
+        }
+        else
+        {
+            QToolTip::hideText();
+            emit cellInfoChanged(QString());
+        }
         return;
-    }
-
-    m_hoverSid = newHover;
-
-    if (sid != UsMap::kNoState)
-    {
-        const QString txt = tooltipTextForState(sid);
-        QToolTip::hideText();
-        QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
-                           Config::GridWidget::tooltopMs);
-
-        updateCellInfoAt(event->position());
-    }
-    else
-    {
-        QToolTip::hideText();
-        emit cellInfoChanged(QString());
     }
 }
 

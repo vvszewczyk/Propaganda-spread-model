@@ -50,7 +50,7 @@ struct Player
 
 struct Pools
 {
-        float deltaNational = 0.0f; // przewaga A nad B w sondażach (np Ia=Ib albo różnica poparcia)
+        float deltaNational = 0.0f;         // różnica poparcia
         float pBand = 0.0f, etaBand = 0.0f; // parametry bandwagon effect - wszyscy idą za liderem
         float pUnder   = 0.0f,
               etaUnder = 0.0f;  // parametry underdog effect - wszyscy kibicują przegrywającemu

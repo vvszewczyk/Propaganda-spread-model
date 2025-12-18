@@ -23,6 +23,7 @@ namespace app::ui
             void setSimulation(const Simulation*) noexcept;
             void setUsMap(const UsMap*) noexcept;
             void setShowGrid(bool) noexcept;
+            void setMapMode(bool) noexcept;
             void clearMap() noexcept;
             void resetView() noexcept;
 
@@ -49,6 +50,7 @@ namespace app::ui
             qreal   m_zoom{1.0};
             QPointF m_pan{0.0, 0.0};
             bool    m_isPanning{false};
+            bool    m_mapMode{false};
             QPoint  m_lastPanPos;
 
             QSet<int>             m_selectedStateIds;

@@ -102,6 +102,8 @@ void MainWindow::buildUi()
 
     m_gridToggle = makeWidget<QCheckBox>(
         this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::showGrid);
+    m_mapToggle = makeWidget<QCheckBox>(
+        this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::useMap);
 
     m_playerSettingsLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::playerSettings);
     m_sideARadio          = makeWidget<QRadioButton>(
@@ -183,9 +185,8 @@ void MainWindow::buildLayout()
 
     // Checkboxes
     auto* rowChecks = new QHBoxLayout();
-    rowChecks->addStretch();
     rowChecks->addWidget(m_gridToggle);
-    rowChecks->addStretch(); // Push checkbox up
+    rowChecks->addWidget(m_mapToggle);
     rightLayout->addLayout(rowChecks);
 
     m_modelParametersLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
@@ -272,6 +273,8 @@ void MainWindow::wire()
     connect(m_simulationSpeedSlider, &QSlider::valueChanged, this,
             &MainWindow::onSimulationSpeedChanged);
     connect(m_gridToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setShowGrid);
+    connect(m_mapToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setMapMode);
+
     connect(m_toggleViewButton, &QPushButton::toggled, this, &MainWindow::onToggleView);
     connect(m_timer.get(), &QTimer::timeout, this, &MainWindow::onStep);
     connect(m_neighbourhoodCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,

@@ -91,6 +91,7 @@ namespace app::ui
             QLabel*       m_budgetLabel{nullptr};
 
             QCheckBox* m_gridToggle{nullptr};
+            QCheckBox* m_mapToggle{nullptr};
 
             QLabel*      m_cellInfoLabel{nullptr};
             QPushButton* m_toggleViewButton{nullptr};
