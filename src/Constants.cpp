@@ -10,10 +10,4 @@ namespace Config
         int gridCols = static_cast<int>(std::floor(pixelWidth / double(cellSize)));
         int gridRows = static_cast<int>(std::floor(pixelHeight / double(cellSize)));
     } // namespace Grid
-
-    namespace Simulation
-    {
-        int randomGrainNumber  = 500;
-        int regularGrainStride = 10;
-    } // namespace Simulation
 } // namespace Config

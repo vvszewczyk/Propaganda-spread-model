@@ -24,6 +24,21 @@ MainWindow::MainWindow(QWidget* parent)
     buildUi();
     buildLayout();
     wire();
+
+    BaseParameters p{};
+    p.wLocal      = 1.0f;
+    p.wDM         = 1.0f;
+    p.wBroadcast  = 0.0f;
+    p.wSocial     = 0.0f;
+    p.thetaScale  = 1.0f;
+    p.margin      = 0.05f;
+    p.switchKappa = 2.0f;
+    p.hysGrow     = 0.02f;
+    p.hysDecay    = 0.01f;
+
+    m_simulation->setParameters(p);
+    m_simulation->setAllThreshold(0.3);
+
     m_fpsTimer.start();
 }
 
@@ -106,7 +121,9 @@ void MainWindow::buildUi()
         this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::useMap);
 
     m_playerSettingsLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::playerSettings);
-    m_sideARadio          = makeWidget<QRadioButton>(
+    m_paintToggle         = makeWidget<QCheckBox>(
+        this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::paintMode);
+    m_sideARadio = makeWidget<QRadioButton>(
         this, [](auto* radio) { radio->setChecked(true); }, Config::UiText::playerA);
     m_sideBRadio  = makeWidget<QRadioButton>(this, nullptr, Config::UiText::playerB);
     m_budgetLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::budget + "N/A");
@@ -223,6 +240,7 @@ void MainWindow::buildLayout()
     // Player settings
     m_playerSettingsLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
     rightLayout->addWidget(m_playerSettingsLabel);
+    rightLayout->addWidget(m_paintToggle);
     auto* playerRadioLayout = new QHBoxLayout();
     playerRadioLayout->addStretch();
     playerRadioLayout->addWidget(m_sideARadio);
@@ -267,6 +285,12 @@ void MainWindow::buildLayout()
 
 void MainWindow::wire()
 {
+    connect(m_gridWidget, &GridWidget::paintCellRequested, this,
+            [this](int x, int y, Side side)
+            {
+                m_simulation->cellAt(x, y).side = side;
+                m_gridWidget->update();
+            });
     connect(m_startButton, &QPushButton::clicked, this, &MainWindow::onStartButtonClicked);
     connect(m_resetButton, &QPushButton::clicked, this, &MainWindow::onResetButtonClicked);
     connect(m_stepButton, &QPushButton::clicked, this, &MainWindow::onStepButtonClicked);
@@ -274,9 +298,9 @@ void MainWindow::wire()
             &MainWindow::onSimulationSpeedChanged);
     connect(m_gridToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setShowGrid);
     connect(m_mapToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setMapMode);
-
+    connect(m_paintToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setPaintMode);
     connect(m_toggleViewButton, &QPushButton::toggled, this, &MainWindow::onToggleView);
-    connect(m_timer.get(), &QTimer::timeout, this, &MainWindow::onStep);
+    connect(m_timer.get(), &QTimer::timeout, this, [this] { onStep(); });
     connect(m_neighbourhoodCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &MainWindow::onNeighbourhoodChanged);
     connect(m_gridWidget, &GridWidget::zoomChanged, this,
@@ -368,9 +392,6 @@ void MainWindow::onResetButtonClicked()
 
     m_startButton->setText(QStringLiteral("Start"));
     m_simulationSpeedSlider->setValue(Config::Timing::simulationSpeed);
-    m_betaSpin->setValue(Config::UiValues::defaultSpin);
-    m_gammaSpin->setValue(Config::UiValues::defaultSpin);
-    m_deltaSpin->setValue(Config::UiValues::defaultSpin);
     m_gridWidget->clearMap();
     m_gridWidget->resetView();
     m_gridWidget->update();
@@ -406,7 +427,7 @@ void MainWindow::onToggleView(bool checked)
 void MainWindow::onNeighbourhoodChanged(int index)
 {
     auto chosenNeighbourhoodType =
-        (index == 0) ? NeighbourhoodType::MOORE : NeighbourhoodType::VON_NEUMANN;
+        (index == 0) ? NeighbourhoodType::VON_NEUMANN : NeighbourhoodType::MOORE;
     m_simulation->setNeighbourhoodType(chosenNeighbourhoodType);
 }
 

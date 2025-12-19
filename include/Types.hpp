@@ -1,15 +1,6 @@
 #pragma once
 #include <cstdint>
 
-enum class State : uint8_t
-{
-    S,
-    E,
-    I,
-    R,
-    D
-};
-
 enum class Side : uint8_t
 {
     NONE,
@@ -25,11 +16,11 @@ enum class NeighbourhoodType : uint8_t
 
 struct CellData
 {
-        State             state;
-        Side              side;
-        NeighbourhoodType neighbourhoodType;
-        double            resilience = 0.0;
-        double            fatigue    = 0.0;
-        bool              active     = true;
-        uint8_t           stateId    = 0;
+        Side side   = Side::NONE;
+        bool active = true;
+
+        double threshold  = 0.5;
+        double hysteresis = 0.0;
+
+        uint8_t stateId = 0;
 };

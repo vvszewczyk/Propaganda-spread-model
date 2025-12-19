@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <qnamespace.h>
 
 using namespace app::ui;
 
@@ -51,7 +52,6 @@ void GridWidget::setMapMode(bool on) noexcept
 
     if (not m_mapMode)
     {
-        m_coloredCells.clear();
         m_coloredStates.clear();
         m_selectedStateIds.clear();
         m_selectedSingleStateId = -1;
@@ -60,9 +60,14 @@ void GridWidget::setMapMode(bool on) noexcept
     update();
 }
 
+void GridWidget::setPaintMode(bool on) noexcept
+{
+    this->m_paintMode = on;
+    setCursor(m_paintMode ? Qt::CrossCursor : Qt::ArrowCursor);
+}
+
 void GridWidget::clearMap() noexcept
 {
-    m_coloredCells.clear();
     m_coloredStates.clear();
     m_selectedStateIds.clear();
     m_selectedSingleStateId = -1;
@@ -81,20 +86,16 @@ void GridWidget::resetView() noexcept
 
 QColor GridWidget::getColorFor(CellData cell) const noexcept
 {
-    switch (cell.state)
+    switch (cell.side)
     {
-    case State::S:
-        return Qt::white;
-    case State::E:
-        return QColor(255, 200, 0);
-    case State::I:
+    case Side::A:
         return Qt::red;
-    case State::R:
-        return QColor(0, 120, 215);
-    case State::D:
-        return Qt::darkGray;
+    case Side::B:
+        return Qt::blue;
+    case Side::NONE:
+        return Qt::white;
     default:
-        return Qt::black;
+        return Qt::magenta;
     }
 }
 
@@ -185,9 +186,6 @@ void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
         return;
     }
 
-    const QColor red(255, 0, 0);
-    const QColor green(0, 255, 0);
-
     int stateId = -1;
     if (m_mapMode)
     {
@@ -201,19 +199,12 @@ void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
 
     if (buttons & Qt::LeftButton)
     {
-        m_coloredCells.insert(cell, red);
+        emit paintCellRequested(cell.x(), cell.y(), Side::A);
     }
 
     if (buttons & Qt::RightButton)
     {
-        if (m_mapMode)
-        {
-            m_coloredStates.insert(stateId, green);
-        }
-        else
-        {
-            m_coloredCells.insert(cell, green);
-        }
+        emit paintCellRequested(cell.x(), cell.y(), Side::B);
     }
 
     update();
@@ -234,26 +225,19 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
         return;
     }
 
-    const auto cellData = m_sim->cell(cell.x(), cell.y());
+    const auto cellData = m_sim->cellAt(cell.x(), cell.y());
 
     QString stateStr;
-    switch (cellData.state)
+    switch (cellData.side)
     {
-    case State::S:
-        stateStr = QStringLiteral("S");
+    case Side::A:
+        stateStr = QStringLiteral("A");
         break;
-    case State::E:
-        stateStr = QStringLiteral("E");
+    case Side::B:
+        stateStr = QStringLiteral("B");
         break;
-    case State::I:
-        stateStr = QStringLiteral("I");
-        break;
-    case State::R:
-        stateStr = QStringLiteral("R");
-        break;
-    case State::D:
-        stateStr = QStringLiteral("D");
-        break;
+    case Side::NONE:
+        stateStr = QStringLiteral("NONE");
     default:
         stateStr = QStringLiteral("?");
         break;
@@ -261,12 +245,11 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
 
     if (!m_mapMode)
     {
-        const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\nResilience=%4\nFatigue=%5")
+        const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\nHysteresis=%4")
                                  .arg(cell.x())
                                  .arg(cell.y())
                                  .arg(stateStr)
-                                 .arg(cellData.resilience, 0, 'f', 2)
-                                 .arg(cellData.fatigue, 0, 'f', 2);
+                                 .arg(cellData.hysteresis, 0, 'f', 2);
 
         emit cellInfoChanged(info);
         return;
@@ -281,13 +264,12 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
 
     const QString usState = tooltipTextForState(stateId);
 
-    const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\n(%4)\nResilience=%5\nFatigue=%6")
+    const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\n(%4)\nHysteresis=%5")
                              .arg(cell.x())
                              .arg(cell.y())
                              .arg(stateStr)
                              .arg(usState)
-                             .arg(cellData.resilience, 0, 'f', 2)
-                             .arg(cellData.fatigue, 0, 'f', 2);
+                             .arg(cellData.hysteresis, 0, 'f', 2);
 
     emit cellInfoChanged(info);
 }
@@ -362,16 +344,12 @@ void GridWidget::rebuildCellsImageIfNeeded() const
                 continue;
             }
 
-            QColor color = getColorFor(m_sim->cell(x, y));
+            QColor color = getColorFor(m_sim->cellAt(x, y));
 
             const int    stateId = products.stateIds[static_cast<std::size_t>(index)];
             const QPoint cellPoint{x, y};
 
-            if (m_coloredCells.contains(cellPoint))
-            {
-                color = m_coloredCells.value(cellPoint);
-            }
-            else if (useMask && m_coloredStates.contains(stateId))
+            if (useMask && m_coloredStates.contains(stateId))
             {
                 color = m_coloredStates.value(stateId);
             }
@@ -541,32 +519,30 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
         return;
     }
 
-    const QColor red(255, 0, 0);
-    const QColor green(0, 255, 0);
-
-    if (!m_mapMode)
+    if (not m_mapMode)
     {
-        if (event->button() == Qt::LeftButton)
-        {
-            if (m_coloredCells.contains(cell) && m_coloredCells.value(cell) == red)
-                m_coloredCells.remove(cell);
-            else
-                m_coloredCells.insert(cell, red);
-        }
-        else if (event->button() == Qt::RightButton)
-        {
-            if (m_coloredCells.contains(cell) && m_coloredCells.value(cell) == green)
-                m_coloredCells.remove(cell);
-            else
-                m_coloredCells.insert(cell, green);
-        }
-
         const QString txt = QStringLiteral("Cell (%1, %2)").arg(cell.x()).arg(cell.y());
         QToolTip::hideText();
         QToolTip::showText(event->globalPosition().toPoint(), txt, this, QRect(),
                            Config::GridWidget::tooltopMs);
 
         updateCellInfoAt(event->position());
+
+        if (not m_paintMode)
+        {
+            update();
+            return event->accept();
+        }
+
+        if (event->button() == Qt::LeftButton)
+        {
+            emit paintCellRequested(cell.x(), cell.y(), Side::A);
+        }
+        else if (event->button() == Qt::RightButton)
+        {
+            emit paintCellRequested(cell.x(), cell.y(), Side::B);
+        }
+
         update();
         return event->accept();
     }
@@ -579,25 +555,11 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
 
     if (event->button() == Qt::LeftButton)
     {
-        if (m_coloredCells.contains(cell) && m_coloredCells.value(cell) == red)
-        {
-            m_coloredCells.remove(cell);
-        }
-        else
-        {
-            m_coloredCells.insert(cell, red);
-        }
+        emit paintCellRequested(cell.x(), cell.y(), Side::A);
     }
     else if (event->button() == Qt::RightButton)
     {
-        if (m_coloredStates.contains(stateId) && m_coloredStates.value(stateId) == green)
-        {
-            m_coloredStates.remove(stateId);
-        }
-        else
-        {
-            m_coloredStates.insert(stateId, green);
-        }
+        emit paintCellRequested(cell.x(), cell.y(), Side::B);
     }
 
     m_selectedSingleStateId = stateId;
@@ -625,7 +587,7 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
         return event->accept();
     }
 
-    if (event->buttons() & (Qt::LeftButton | Qt::RightButton))
+    if (m_paintMode and (event->buttons() & (Qt::LeftButton | Qt::RightButton)))
     {
         applyBrushAt(event->position(), event->buttons());
         return event->accept();
@@ -636,7 +598,7 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
         return;
     }
 
-    if (!m_mapMode)
+    if (m_mapMode)
     {
         const QPoint cell     = productPointFromWidgetPos(event->pos());
         const int    newHover = (cell.x() < 0 || cell.y() < 0)

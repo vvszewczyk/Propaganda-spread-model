@@ -10,30 +10,23 @@
 // DM to "lokalne rozmowy / prywatne wiadomości", które w CA są po prostu wpływem sąsiadów w
 // siatce (NeighbourhoodType, wLocal).
 
-// β₀ (beta0) – jak łatwo komórka „łapie” przekaz
-// → bazowa „czułość” na ekspozycję:  przy przejściu S → E albo S/E → I
-
-// ρ₀ (rho0) – jak łatwo z „Exposed” przejść do „Infested”
-// → bazowe E → I (przyjęcie narracji po zauważeniu)
-
-// γ₀ (gamma0) – jak szybko komórka przestaje szerzyć przekaz
-// → I → R (uodpornienie, fact-check)
-
-// δ₀ (delta0) – jak szybko wypada z gry
-// → I → D (ban/zmęczenie)
-
 struct BaseParameters
 {
-        float beta0 = 0.0f, gamma0 = 0.0f, rho0 = 0.0f,
-              delta0     = 0.0f; // współczynniki tego jak łatwo przejść między stanami
-        float sBroadcast = 0.0f, sSocial = 0.0f,
-              sDM = 0.0f; // wagi ile "warte" są poszczególne kanały (Broadcast, Social, DM) w
+        float wBroadcast = 0.0f, wSocial = 0.0f,
+              wDM = 0.0f; // wagi ile "warte" są poszczególne kanały (Broadcast, Social, DM) w
                           // obliczaniu ekspozycji, jak bardzo społeczeństwo ufa danemu medium
         float wLocal =
-            0.0f; // waga lokalnych sąsiadów (ile "warci" są sąsiedzi w danym sąsiedztwie)
+            1.0f; // waga lokalnych sąsiadów (ile "warci" są sąsiedzi w danym sąsiedztwie)
+        float thetaScale = 1.0f; // Próg decyzji: ile trzeba "pola" żeby neutralny wszedł w A/B
+        float margin     = 0.0f; // Margines przewagi (żeby remisy nie powodowały fluktuacji)
+
+        // Histereza (utrudnia zmianę A<->B)
+        float switchKappa = 1.0f;  // κ: jak histereza podbija próg zmiany strony
+        float hysGrow     = 0.02f; // jak szybko rośnie histereza przy zgodnych bodźcach
+        float hysDecay    = 0.01f; // jak szybko zanika bez wsparcia
 };
 
-struct Controls
+struct Controls // dokładają sygnał do kanału na korzyść strony gracza w danym kroku
 {
         float whiteBroadcast = 0.0f, whiteSocial = 0.0f, whiteDM = 0.0f;
         float greyBroadcast = 0.0f, greySocial = 0.0f, greyDM = 0.0f;
@@ -45,14 +38,12 @@ struct Player
         Controls controls; // "pokrętła" jak mocno dana strona używa danego kanału/koloru propagandy
                            // w danym kroku, inaczej intensywność sygnału
         float  budget    = 0.0f; // budżet jaki gracz może przeznaczyć na kampanię
-        double costWhite = 1.0, costGrey = 2.0, costBlack = 3.0; // ceny jednostek danej propagandy
+        double costWhite = 1.0, costGrey = 2.0, costBlack = 3.0;
 };
 
-struct Pools
+struct ChannelSignal
 {
-        float deltaNational = 0.0f;         // różnica poparcia
-        float pBand = 0.0f, etaBand = 0.0f; // parametry bandwagon effect - wszyscy idą za liderem
-        float pUnder   = 0.0f,
-              etaUnder = 0.0f;  // parametry underdog effect - wszyscy kibicują przegrywającemu
-        bool perState  = false; // czy liczymy globalnie czy na stan
+        float broadcast = 0.0f; // dodatnie dla A, ujemne dla B
+        float social    = 0.0f;
+        float dm        = 0.0f;
 };

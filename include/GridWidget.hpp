@@ -24,6 +24,7 @@ namespace app::ui
             void setUsMap(const UsMap*) noexcept;
             void setShowGrid(bool) noexcept;
             void setMapMode(bool) noexcept;
+            void setPaintMode(bool) noexcept;
             void clearMap() noexcept;
             void resetView() noexcept;
 
@@ -31,6 +32,7 @@ namespace app::ui
 
         signals:
             void cellRemoved(int x, int y);
+            void paintCellRequested(int x, int y, Side side);
             void zoomChanged(double zoomFactor);
             void cellInfoChanged(const QString& info);
 
@@ -51,13 +53,13 @@ namespace app::ui
             QPointF m_pan{0.0, 0.0};
             bool    m_isPanning{false};
             bool    m_mapMode{false};
+            bool    m_paintMode{false};
             QPoint  m_lastPanPos;
 
-            QSet<int>             m_selectedStateIds;
-            int                   m_selectedSingleStateId{-1};
-            QHash<int, QColor>    m_coloredStates;
-            QHash<QPoint, QColor> m_coloredCells;
-            int                   m_hoverSid{-1};
+            QSet<int>          m_selectedStateIds;
+            int                m_selectedSingleStateId{-1};
+            QHash<int, QColor> m_coloredStates;
+            int                m_hoverSid{-1};
 
             mutable QImage m_cellsImage;
 

@@ -92,6 +92,7 @@ namespace app::ui
 
             QCheckBox* m_gridToggle{nullptr};
             QCheckBox* m_mapToggle{nullptr};
+            QCheckBox* m_paintToggle{nullptr};
 
             QLabel*      m_cellInfoLabel{nullptr};
             QPushButton* m_toggleViewButton{nullptr};

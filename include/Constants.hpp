@@ -2,6 +2,7 @@
 #include <QColor>
 #include <QStringLiteral>
 #include <QVector3D>
+#include <qvectornd.h>
 
 namespace Config
 {
@@ -62,6 +63,7 @@ namespace Config
         inline const QString playerB           = QStringLiteral("Player B");
         inline const QString budget            = QStringLiteral("Budget: ");
         inline const QString useMap            = QStringLiteral("Use map");
+        inline const QString paintMode         = QStringLiteral("Paint mode");
 
     } // namespace UiText
 
@@ -93,24 +95,20 @@ namespace Config
 
     namespace Simulation
     {
-        extern int randomGrainNumber;
-        extern int regularGrainStride;
+        constexpr float kEffWhite = 1.0f;
+        constexpr float kEffGray  = 1.2f;
+        constexpr float kEffBlack = 1.5f;
     } // namespace Simulation
 
     namespace Neighbourhood
     {
-        inline const QVector3D VN[6] = {QVector3D(1, 0, 0), QVector3D(-1, 0, 0),
-                                        QVector3D(0, 1, 0), QVector3D(0, -1, 0),
-                                        QVector3D(0, 0, 1), QVector3D(0, 0, -1)};
+        inline const QVector2D VN[4] = {QVector2D{1, 0}, QVector2D{-1, 0}, QVector2D{0, 1},
+                                        QVector2D{0, -1}};
 
-        inline const QVector3D MOORE[26] = {
-            QVector3D(-1, -1, -1), QVector3D(-1, -1, 0), QVector3D(-1, -1, 1), QVector3D(-1, 0, -1),
-            QVector3D(-1, 0, 0),   QVector3D(-1, 0, 1),  QVector3D(-1, 1, -1), QVector3D(-1, 1, 0),
-            QVector3D(-1, 1, 1),   QVector3D(0, -1, -1), QVector3D(0, -1, 0),  QVector3D(0, -1, 1),
-            QVector3D(0, 0, -1),   QVector3D(0, 0, 1),   QVector3D(0, 1, -1),  QVector3D(0, 1, 0),
-            QVector3D(0, 1, 1),    QVector3D(1, -1, -1), QVector3D(1, -1, 0),  QVector3D(1, -1, 1),
-            QVector3D(1, 0, -1),   QVector3D(1, 0, 0),   QVector3D(1, 0, 1),   QVector3D(1, 1, -1),
-            QVector3D(1, 1, 0),    QVector3D(1, 1, 1)};
+        inline const QVector2D MOORE[8] = {QVector2D{-1, -1}, QVector2D{-1, 0}, QVector2D{-1, 1},
+                                           QVector2D{0, -1},  QVector2D{0, 1},  QVector2D{1, -1},
+                                           QVector2D{1, 0},   QVector2D{1, 1}};
+
     } // namespace Neighbourhood
 
     namespace GridWidget
