@@ -6,13 +6,41 @@
 
 #include <algorithm>
 #include <random>
+#include <span>
+
+namespace
+{
+    inline float getSideScalar(Side side)
+    {
+        switch (side)
+        {
+        case Side::A:
+            return 1.0f;
+        case Side::B:
+            return -1.0f;
+        default:
+            return 0.0f;
+        }
+    }
+
+    inline float computeChannelStrength(float white, float grey, float black)
+    {
+        return white * Config::Simulation::kEffWhite + grey * Config::Simulation::kEffGray +
+               black * Config::Simulation::kEffBlack;
+    }
+
+    inline float clamp(float x)
+    {
+        return std::max(0.0f, std::min(1.0f, x));
+    }
+} // namespace
 
 Simulation::Simulation(int cols, int rows)
     : m_cols{cols},
       m_rows{rows},
       m_currentGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
       m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
-      m_iteration{0}
+      m_rng{std::random_device{}()}
 {
     this->seedRandomly(500, 500);
 }
@@ -58,33 +86,6 @@ void Simulation::reset()
     seedRandomly(500, 500);
     setAllThreshold(0.3);
 }
-
-namespace
-{
-    inline int spin(Side side)
-    {
-        switch (side)
-        {
-        case Side::A:
-            return +1;
-        case Side::B:
-            return -1;
-        default:
-            return 0;
-        }
-    }
-
-    inline float channelEff(float white, float grey, float black)
-    {
-        return white * Config::Simulation::kEffWhite + grey * Config::Simulation::kEffGray +
-               black * Config::Simulation::kEffBlack;
-    }
-
-    inline float clamp(float x)
-    {
-        return std::max(0.0f, std::min(1.0f, x));
-    }
-} // namespace
 
 CellData& Simulation::cellAt(int x, int y)
 {
@@ -145,76 +146,167 @@ void Simulation::seedRandomly(int countA, int countB)
     place(Side::B, countB);
 }
 
-static float computeSpendCost(const Player& player)
+GlobalSignals Simulation::calculateCampaignImpact()
 {
-    const auto& controls = player.controls;
-    const float sumWhite = controls.whiteBroadcast + controls.whiteSocial + controls.whiteDM;
-    const float sumGrey  = controls.greyBroadcast + controls.greySocial + controls.greyDM;
-    const float sumBlack = controls.blackBroadcast + controls.blackSocial + controls.blackDM;
+    // Calculate how much players want to spend
+    float costA = m_playerA.calculatePlannedCost();
+    float costB = m_playerB.calculatePlannedCost();
 
-    return static_cast<float>(player.costWhite) * sumWhite +
-           static_cast<float>(player.costGrey) * sumGrey +
-           static_cast<float>(player.costBlack) * sumBlack;
+    // Scale budget if they are too poor for action
+    float scaleA =
+        (costA > 0 and m_playerA.budget > 0) ? std::min(1.0f, m_playerA.budget / costA) : 0.0f;
+    float scaleB =
+        (costB > 0 and m_playerB.budget > 0) ? std::min(1.0f, m_playerB.budget / costB) : 0.0f;
+
+    m_playerA.budget -= costA * scaleA;
+    m_playerB.budget -= costB * scaleB;
+
+    GlobalSignals globalSignals;
+    const auto&   controlsA = m_playerA.controls;
+    const auto&   controlsB = m_playerB.controls;
+
+    // clang-format off
+    // Broadcast
+    const float bA = computeChannelStrength(controlsA.whiteBroadcast,
+                                             controlsA.greyBroadcast,
+                                            controlsA.blackBroadcast) * scaleA;
+    const float bB = computeChannelStrength(controlsB.whiteBroadcast,
+                                             controlsB.greyBroadcast,
+                                            controlsB.blackBroadcast) * scaleB;
+    globalSignals.broadcastPressure = m_parameters.wBroadcast * (bA - bB);
+
+    // Social
+    float sA = computeChannelStrength(controlsA.whiteSocial,
+                                       controlsA.greySocial,
+                                      controlsA.blackSocial) * scaleA;
+    float sB = computeChannelStrength(controlsB.whiteSocial,
+                                       controlsB.greySocial,
+                                      controlsB.blackSocial) * scaleB;
+    globalSignals.socialPressure = m_parameters.wSocial * (sA - sB);
+
+    // DM
+    float dA =
+        computeChannelStrength(controlsA.whiteDM,
+                                controlsA.greyDM,
+                               controlsA.blackDM) * scaleA;
+    float dB =
+        computeChannelStrength(controlsB.whiteDM,
+                                controlsB.greyDM,
+                               controlsB.blackDM) * scaleB;
+    globalSignals.dmPressure = m_parameters.wDM * (dA - dB);
+
+    // clang-format on
+    return globalSignals;
 }
 
-static float budgetScale(const Player& player)
+float Simulation::calculateLocalPressure(int x, int y) const
 {
-    const float cost = computeSpendCost(player);
-    if (cost <= 0.0f)
+    auto idx = [&](int xn, int yn) -> std::size_t
     {
-        return 0.0f;
-    }
-    if (player.budget <= 0.0f)
+        return static_cast<std::size_t>(yn) * static_cast<std::size_t>(m_cols) +
+               static_cast<std::size_t>(xn);
+    };
+
+    float hDM                 = 0.0f;
+    int   count               = 0;
+    auto  accumulateNeighbour = [&](int nx, int ny)
     {
-        return 0.0f;
-    }
-    if (player.budget >= cost)
+        if (nx < 0 || ny < 0 || nx >= m_cols || ny >= m_rows)
+        {
+            return;
+        }
+        const CellData& neighborCell = m_currentGrid[idx(nx, ny)];
+        if (not neighborCell.active)
+        {
+            return;
+        }
+        if (neighborCell.side != Side::NONE)
+        {
+            hDM += getSideScalar(neighborCell.side);
+            ++count;
+        }
+    };
+
+    std::span<const QVector2D> offsets =
+        (m_neighbourhoodType == NeighbourhoodType::MOORE)
+            ? std::span<const QVector2D>(Config::Neighbourhood::MOORE)
+            : std::span<const QVector2D>(Config::Neighbourhood::VN);
+
+    for (const auto& offset : offsets)
     {
-        return 1.0f;
+        accumulateNeighbour(x + static_cast<int>(offset.x()), y + static_cast<int>(offset.y()));
     }
-    return static_cast<float>(player.budget) / cost;
+
+    return (count == 0) ? 0.0f : hDM / static_cast<float>(count);
 }
 
-static ChannelSignal netChannelSignal(Player& A, Player& B, const BaseParameters& params)
+void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell, float h)
 {
-    // skaluje “wydatki” jeśli budżet niewystarczający i odejmuje z budżetu
-    const float sA = budgetScale(A);
-    const float sB = budgetScale(B);
+    const float theta  = static_cast<float>(currentCell.threshold) * m_parameters.thetaScale;
+    const float margin = m_parameters.margin;
 
-    // odejmij faktyczny koszt
-    A.budget -= computeSpendCost(A) * sA;
-    B.budget -= computeSpendCost(B) * sB;
+    if (currentCell.side == Side::NONE)
+    {
+        if (h >= theta + margin)
+        {
+            nextCell.side = Side::A;
+        }
+        else if (h <= -(theta + margin))
+        {
+            nextCell.side = Side::B;
+        }
 
-    const auto& a = A.controls;
-    const auto& b = B.controls;
+        // If neutral -> hysteresis decrease
+        nextCell.hysteresis =
+            std::max(0.0, currentCell.hysteresis - static_cast<double>(m_parameters.hysDecay));
+    }
+    else
+    {
+        const float resistance =
+            1.0f + m_parameters.switchKappa * static_cast<float>(currentCell.hysteresis);
+        const float effectiveTheta = theta * resistance;
 
-    ChannelSignal sig{};
-
-    // Broadcast: A dodatnie, B ujemne
-    const float aBroad =
-        channelEff(a.whiteBroadcast * sA, a.greyBroadcast * sA, a.blackBroadcast * sA);
-    const float bBroad =
-        channelEff(b.whiteBroadcast * sB, b.greyBroadcast * sB, b.blackBroadcast * sB);
-    sig.broadcast = params.wBroadcast * (aBroad - bBroad);
-
-    // Social (na razie tylko globalny sygnał; później dołożymy graf)
-    const float aSoc = channelEff(a.whiteSocial * sA, a.greySocial * sA, a.blackSocial * sA);
-    const float bSoc = channelEff(b.whiteSocial * sB, b.greySocial * sB, b.blackSocial * sB);
-    sig.social       = params.wSocial * (aSoc - bSoc);
-
-    // DM jako “dopalacz” kanału lokalnego (też może być sterowane kampanią)
-    const float aDm = channelEff(a.whiteDM * sA, a.greyDM * sA, a.blackDM * sA);
-    const float bDm = channelEff(b.whiteDM * sB, b.greyDM * sB, b.blackDM * sB);
-    sig.dm          = params.wDM * (aDm - bDm);
-
-    return sig;
+        if (currentCell.side == Side::A)
+        {
+            if (h <= -(effectiveTheta + margin))
+            {
+                nextCell.side       = Side::B;
+                nextCell.hysteresis = 0.0;
+            }
+            else
+            {
+                if (h > 0)
+                {
+                    nextCell.hysteresis =
+                        currentCell.hysteresis + static_cast<double>(m_parameters.hysGrow);
+                }
+            }
+        }
+        else if (currentCell.side == Side::B)
+        {
+            if (h >= effectiveTheta + margin)
+            {
+                nextCell.side       = Side::A;
+                nextCell.hysteresis = 0.0;
+            }
+            else
+            {
+                if (h < 0)
+                {
+                    nextCell.hysteresis =
+                        currentCell.hysteresis + static_cast<double>(m_parameters.hysGrow);
+                }
+            }
+        }
+    }
 }
+
 void Simulation::step()
 {
-    m_nextGrid                       = m_currentGrid;
-    const ChannelSignal globalSignal = netChannelSignal(m_playerA, m_playerB, m_parameters);
+    m_nextGrid                        = m_currentGrid;
+    const GlobalSignals globalSignals = calculateCampaignImpact();
 
-    auto idx = [&](int x, int y) -> std::size_t
+    auto idx = [&](int x, int y)
     {
         return static_cast<std::size_t>(y) * static_cast<std::size_t>(m_cols) +
                static_cast<std::size_t>(x);
@@ -226,101 +318,16 @@ void Simulation::step()
         {
             const std::size_t i           = idx(x, y);
             const CellData&   currentCell = m_currentGrid[i];
+            CellData&         nextCell    = m_nextGrid[i];
 
             if (not currentCell.active)
             {
                 continue;
             }
 
-            // Presja sąsiadów
-            float hDM                 = 0.0f;
-            int   n                   = 0;
-            auto  accumulateNeighbour = [&](int nx, int ny)
-            {
-                if (nx < 0 || ny < 0 || nx >= m_cols || ny >= m_rows)
-                {
-                    return;
-                }
-                const CellData& neighborCell = m_currentGrid[idx(nx, ny)];
-                if (not neighborCell.active)
-                {
-                    return;
-                }
-                const int s = spin(neighborCell.side);
-                if (s != 0)
-                {
-                    hDM += static_cast<float>(s);
-                    ++n;
-                }
-            };
-
-            if (m_neighbourhoodType == NeighbourhoodType::VON_NEUMANN)
-            {
-                for (const auto& offset : Config::Neighbourhood::VN)
-                {
-                    accumulateNeighbour(x + static_cast<int>(offset.x()),
-                                        y + static_cast<int>(offset.y()));
-                }
-            }
-            else if (m_neighbourhoodType == NeighbourhoodType::MOORE)
-            {
-                for (const auto& offset : Config::Neighbourhood::MOORE)
-                {
-                    accumulateNeighbour(x + static_cast<int>(offset.x()),
-                                        y + static_cast<int>(offset.y()));
-                }
-            }
-
-            if (n > 0)
-            {
-                hDM /= static_cast<float>(n);
-            }
-            else
-            {
-                hDM = 0.0f;
-            }
-            hDM *= (m_parameters.wLocal);
-
-            float h = 0.0f;
-            h += m_parameters.wDM * hDM;
-            h += globalSignal.broadcast;
-            h += globalSignal.social;
-            h += globalSignal.dm;
-
-            const float theta = static_cast<float>(currentCell.threshold) * m_parameters.thetaScale;
-            const float margin = m_parameters.margin;
-
-            CellData& next = m_nextGrid[i];
-
-            if (currentCell.side == Side::NONE)
-            {
-                if (h >= theta + margin)
-                {
-                    next.side = Side::A;
-                }
-                else if (h <= -(theta + margin))
-                {
-                    next.side = Side::B;
-                }
-
-                next.hysteresis = std::max(0.0, currentCell.hysteresis -
-                                                    static_cast<double>(m_parameters.hysDecay));
-            }
-            else
-            {
-                const float thetaSwitch =
-                    theta *
-                    (1.0f + m_parameters.switchKappa * static_cast<float>(currentCell.hysteresis));
-
-                if (currentCell.side == Side::A && h <= -(thetaSwitch + margin))
-                {
-                    next.side = Side::B;
-                }
-                else if (currentCell.side == Side::B && h >= thetaSwitch + margin)
-                {
-                    next.side = Side::A;
-                }
-            }
+            const float localPressure = calculateLocalPressure(x, y);
+            float totalInfluence      = (localPressure * m_parameters.wLocal) + globalSignals.sum();
+            updateCellState(currentCell, nextCell, totalInfluence);
         }
     }
     m_currentGrid.swap(m_nextGrid);
