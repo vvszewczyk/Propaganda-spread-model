@@ -62,8 +62,10 @@ namespace Config
         inline const QString playerA           = QStringLiteral("Player A");
         inline const QString playerB           = QStringLiteral("Player B");
         inline const QString budget            = QStringLiteral("Budget: ");
+        inline const QString cost              = QStringLiteral("Cost: ");
         inline const QString useMap            = QStringLiteral("Use map");
         inline const QString paintMode         = QStringLiteral("Paint mode");
+        inline const QString physics           = QStringLiteral("Physics");
 
     } // namespace UiText
 

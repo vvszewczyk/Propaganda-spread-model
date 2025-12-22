@@ -1,309 +1,279 @@
 #include "MainWindow.hpp"
 
+#include "GridWidget.hpp"
+#include "PlayerControlWidget.hpp"
+#include "SimulationControlWidget.hpp"
+#include "WorldPhysicsWidget.hpp"
+
 #include <QBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QSlider>
 #include <QStringLiteral>
-#include <qcombobox.h>
-#include <qlabel.h>
-#include <qnamespace.h>
-#include <qradiobutton.h>
-#include <qspinbox.h>
+#include <UiUtils.hpp>
 
 using namespace app::ui;
 
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent),
-      m_usMap(std::make_unique<UsMap>(
-          Config::Map::usSvgPath, Config::Grid::gridCols, Config::Grid::gridRows)),
-      m_simulation(std::make_unique<Simulation>(Config::Grid::gridCols, Config::Grid::gridRows)),
-      m_timer(std::make_unique<QTimer>(this))
+MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
     setFixedSize(Config::Window::width, Config::Window::height);
-    buildUi();
+
+    initModel();
+    createWidgets();
     buildLayout();
-    wire();
+    setupPhysicsDock();
+    wireAll();
+    applyDefaults();
 
-    BaseParameters p{};
-    p.wLocal      = 1.0f;
-    p.wDM         = 1.0f;
-    p.wBroadcast  = 0.0f;
-    p.wSocial     = 0.0f;
-    p.thetaScale  = 1.0f;
-    p.margin      = 0.05f;
-    p.switchKappa = 2.0f;
-    p.hysGrow     = 0.02f;
-    p.hysDecay    = 0.01f;
-
-    m_simulation->setParameters(p);
-    m_simulation->setAllThreshold(0.3);
-
-    m_fpsTimer.start();
+    model.fpsTimer.start();
 }
 
 MainWindow::~MainWindow() = default;
 
-void MainWindow::buildUi()
+void MainWindow::initModel()
 {
-    m_contentStack = new QStackedWidget(this);
-    m_gridWidget   = new GridWidget(this);
-    m_statsWidget  = new QWidget(this);
+    model.usMap = std::make_unique<UsMap>(Config::Map::usSvgPath, Config::Grid::gridCols,
+                                          Config::Grid::gridRows);
 
-    m_gridWidget->setFixedSize(Config::Grid::pixelWidth, Config::Grid::pixelHeight);
-    m_gridWidget->setSimulation(m_simulation.get());
+    model.simulation = std::make_unique<Simulation>(Config::Grid::gridCols, Config::Grid::gridRows);
+
+    model.timer = new QTimer(this);
+}
+
+void MainWindow::createWidgets()
+{
+    ui.contentStack = new QStackedWidget(this);
+
+    ui.gridWidget = new GridWidget(this);
+    ui.gridWidget->setSimulation(model.simulation.get());
+    ui.gridWidget->setFixedSize(Config::Grid::pixelWidth, Config::Grid::pixelHeight);
+
+    ui.statsWidget = new QWidget(this);
+
+    ui.contentStack->addWidget(ui.gridWidget);
+    ui.contentStack->addWidget(ui.statsWidget);
+    ui.contentStack->setCurrentIndex(static_cast<int>(Page::Simulation));
+
+    ui.simulationControlWidget = new SimulationControlWidget(this);
+
+    ui.physics = new WorldPhysicsWidget(this);
+
+    ui.tabsWidget    = new QTabWidget(this);
+    ui.playerAWidget = new PlayerControlWidget("Side A", this);
+    ui.playerBWidget = new PlayerControlWidget("Side B", this);
+    ui.tabsWidget->addTab(ui.playerAWidget, "Player A");
+    ui.tabsWidget->addTab(ui.playerBWidget, "Player B");
+
+    ui.scenarioPresetLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::scenarioPreset);
+    ui.scenarioPresetCombo = makeWidget<QComboBox>(
+        this, [](auto* comboBox) { comboBox->addItems({Config::UiText::scenario1}); });
+
+    ui.playerSettingsLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::playerSettings);
+    ui.gridToggle          = makeWidget<QCheckBox>(
+        this, [](auto* c) { c->setChecked(false); }, Config::UiText::showGrid);
+    ui.mapToggle =
+        makeWidget<QCheckBox>(this, [](auto* c) { c->setChecked(false); }, Config::UiText::useMap);
+    ui.paintToggle = makeWidget<QCheckBox>(
+        this, [](auto* c) { c->setChecked(false); }, Config::UiText::paintMode);
+
+    ui.toggleViewButton = makeWidget<QPushButton>(
+        this, [](auto* b) { b->setCheckable(true); }, Config::UiText::showStats);
+    ui.physicsButton = makeWidget<QPushButton>(
+        this,
+        [](QPushButton* b)
+        {
+            b->setCheckable(true);
+            b->setChecked(false);
+        },
+        Config::UiText::physics);
+
+    ui.cellInfoLabel  = makeWidget<QLabel>(this, nullptr, Config::UiText::cellInfoPrefix + "N/A");
+    ui.iterationLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::iterationPrefix + "0");
+
+    ui.zoomLabel = makeWidget<QLabel>(ui.gridWidget, nullptr, Config::UiText::zoom + "100%");
+    ui.fpsLabel  = makeWidget<QLabel>(ui.gridWidget, nullptr, Config::UiText::fps + "0");
 
     QString error;
-    if (!m_usMap->buildStateProducts(&error))
+    if (!model.usMap->buildStateProducts(&error))
     {
         qWarning() << "Failed to build map: " << error;
     }
-    m_gridWidget->setUsMap(m_usMap.get());
+    ui.gridWidget->setUsMap(model.usMap.get());
+}
 
-    m_simulationLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationControl);
-    m_startButton     = makeWidget<QPushButton>(this, nullptr, Config::UiText::start);
-    m_resetButton     = makeWidget<QPushButton>(this, nullptr, Config::UiText::reset);
-    m_stepButton      = makeWidget<QPushButton>(this, nullptr, Config::UiText::step);
+void MainWindow::setupPhysicsDock()
+{
+    ui.physicsDock = new QDockWidget(tr("Settings"), this);
 
-    m_simulationSpeedLabel  = makeWidget<QLabel>(this, nullptr, Config::UiText::simulationSpeed);
-    m_simulationSpeedSlider = makeWidget<QSlider>(
-        this,
-        [](QSlider* slider)
-        {
-            slider->setRange(0, 100);
-            slider->setValue(Config::Timing::simulationSpeed);
-        },
-        Qt::Horizontal);
-    m_slowerLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::slower);
-    m_fasterLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::faster);
+    ui.physicsDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
+                                    Qt::BottomDockWidgetArea);
 
-    m_neighbourhoodLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::neighbourhood);
-    m_neighbourhoodCombo = makeWidget<QComboBox>(
-        this, [](auto* comboBox)
-        { comboBox->addItems({Config::UiText::vonNeumann, Config::UiText::moore}); });
+    ui.physicsDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
-    m_scenarioPresetLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::scenarioPreset);
-    m_scenarioPresetCombo = makeWidget<QComboBox>(
-        this, [](auto* comboBox) { comboBox->addItems({Config::UiText::scenario1}); });
+    auto* scroll = new QScrollArea(ui.physicsDock);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
 
-    m_modelParametersLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::modelParameters);
-    m_betaLabel            = makeWidget<QLabel>(this, nullptr, Config::UiText::beta);
-    m_betaSpin             = makeWidget<QDoubleSpinBox>(this,
-                                                        [](QDoubleSpinBox* spin)
-                                                        {
-                                                spin->setRange(Config::UiValues::minSpin,
-                                                                           Config::UiValues::maxSpin);
-                                                spin->setSingleStep(Config::UiValues::stepSpin);
-                                                spin->setValue(Config::UiValues::defaultSpin);
-                                            });
-    m_gammaLabel           = makeWidget<QLabel>(this, nullptr, Config::UiText::gamma);
-    m_gammaSpin            = makeWidget<QDoubleSpinBox>(this,
-                                                        [](QDoubleSpinBox* spin)
-                                                        {
-                                                 spin->setRange(Config::UiValues::minSpin,
-                                                                           Config::UiValues::maxSpin);
-                                                 spin->setSingleStep(Config::UiValues::stepSpin);
-                                                 spin->setValue(Config::UiValues::defaultSpin);
-                                             });
-    m_deltaLabel           = makeWidget<QLabel>(this, nullptr, Config::UiText::delta);
-    m_deltaSpin            = makeWidget<QDoubleSpinBox>(this,
-                                                        [](QDoubleSpinBox* spin)
-                                                        {
-                                                 spin->setRange(Config::UiValues::minSpin,
-                                                                           Config::UiValues::maxSpin);
-                                                 spin->setSingleStep(Config::UiValues::stepSpin);
-                                                 spin->setValue(Config::UiValues::defaultSpin);
-                                             });
+    ui.physics->setParent(scroll);
+    scroll->setWidget(ui.physics);
+    ui.physicsDock->setWidget(scroll);
 
-    m_gridToggle = makeWidget<QCheckBox>(
-        this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::showGrid);
-    m_mapToggle = makeWidget<QCheckBox>(
-        this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::useMap);
+    ui.physicsDock->hide();
+    ui.physicsDock->setFloating(true);
+    ui.physicsDock->resize(420, 600);
+    ui.physicsDock->move(this->geometry().center() - QPoint(210, 300));
 
-    m_playerSettingsLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::playerSettings);
-    m_paintToggle         = makeWidget<QCheckBox>(
-        this, [](auto* checkbox) { checkbox->setChecked(false); }, Config::UiText::paintMode);
-    m_sideARadio = makeWidget<QRadioButton>(
-        this, [](auto* radio) { radio->setChecked(true); }, Config::UiText::playerA);
-    m_sideBRadio  = makeWidget<QRadioButton>(this, nullptr, Config::UiText::playerB);
-    m_budgetLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::budget + "N/A");
+    connect(ui.physicsButton, &QPushButton::toggled, this,
+            [this](bool on)
+            {
+                ui.physicsDock->setVisible(on);
 
-    m_cellInfoLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::cellInfoPrefix + "N/A");
-    m_zoomLabel     = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::zoom + "100%");
-    m_fpsLabel      = makeWidget<QLabel>(m_gridWidget, nullptr, Config::UiText::fps + "0");
+                if (on)
+                {
+                    ui.physicsDock->raise();
+                }
+            });
 
-    m_toggleViewButton = makeWidget<QPushButton>(
-        this, [](auto* button) { button->setCheckable(true); }, Config::UiText::showStats);
-
-    m_iterationLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::iterationPrefix + "0");
+    connect(ui.physicsDock, &QDockWidget::visibilityChanged, this,
+            [this](bool visible)
+            {
+                if (ui.physicsButton->isChecked() != visible)
+                {
+                    ui.physicsButton->blockSignals(true);
+                    ui.physicsButton->setChecked(visible);
+                    ui.physicsButton->blockSignals(false);
+                }
+            });
 }
 
 void MainWindow::buildLayout()
 {
     auto* centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
-    // centralWidget->setStyleSheet(Config::centralWidgetColor); // lightgreen
 
     auto* mainLayout = new QHBoxLayout(centralWidget);
     mainLayout->setContentsMargins(Config::Layout::mainMargin, Config::Layout::mainMargin,
                                    Config::Layout::mainMargin, Config::Layout::mainMargin);
 
-    auto* left = new QWidget(centralWidget);
-    // left->setStyleSheet(Config::leftBlockColor);
+    auto* left       = new QWidget(centralWidget);
     auto* leftLayout = new QVBoxLayout(left);
-    m_contentStack->addWidget(m_gridWidget);
-    m_contentStack->addWidget(m_statsWidget);
-    m_contentStack->setCurrentIndex(0);
-    leftLayout->addWidget(m_contentStack, 1);
+    leftLayout->addWidget(ui.contentStack, 1);
     leftLayout->addStretch();
+
     mainLayout->addWidget(left, Config::Layout::leftPanelStretch);
 
-    auto* right = new QWidget(centralWidget);
-    // right->setStyleSheet(Config::Colors::rightBlockColor);
+    auto* right       = new QWidget(centralWidget);
     auto* rightLayout = new QVBoxLayout(right);
-    m_simulationLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
-    rightLayout->addWidget(m_simulationLabel);
+    // right->setObjectName("RightPanel");
+    // right->setStyleSheet(
+    //     R"(QWidget#RightPanel {border: 1px solid black; background: transparent;})");
 
-    // Start/pause and reset buttons
-    auto* rowButtons = new QHBoxLayout();
-    QSize buttonSize(Config::Layout::buttonWidth, Config::Layout::buttonHeight);
-    rowButtons->addStretch();
-    m_startButton->setFixedSize(buttonSize);
-    rowButtons->addWidget(m_startButton);
-    rowButtons->addSpacing(Config::Layout::rowButtonsSpacing); // Space between buttons
-    m_resetButton->setFixedSize(buttonSize);
-    rowButtons->addWidget(m_resetButton);
-    rowButtons->addSpacing(Config::Layout::rowButtonsSpacing); // Space between buttons
-    m_stepButton->setFixedSize(buttonSize);
-    rowButtons->addWidget(m_stepButton);
-    rowButtons->addStretch();
-    rightLayout->addLayout(rowButtons);
-
-    // Simulation speed slider
-    rightLayout->addWidget(m_simulationSpeedLabel);
-    auto* speedControlLayout = new QHBoxLayout();
-    speedControlLayout->setContentsMargins(0, 0, 0, 0);
-    m_slowerLabel->setAlignment(Qt::AlignCenter);
-    m_slowerLabel->setStyleSheet("font-size: 11pt;");
-    m_fasterLabel->setAlignment(Qt::AlignCenter);
-    m_fasterLabel->setStyleSheet("font-size: 11pt;");
-    speedControlLayout->addWidget(m_slowerLabel);
-    speedControlLayout->addWidget(m_simulationSpeedSlider);
-    speedControlLayout->addWidget(m_fasterLabel);
-    rightLayout->addLayout(speedControlLayout);
-
-    // Neighbourhood comboBox
-    rightLayout->addWidget(m_neighbourhoodLabel);
-    rightLayout->addWidget(m_neighbourhoodCombo);
+    rightLayout->addWidget(ui.simulationControlWidget);
 
     // Scenario preset comboBox
-    rightLayout->addWidget(m_scenarioPresetLabel);
-    rightLayout->addWidget(m_scenarioPresetCombo);
+    rightLayout->addWidget(ui.scenarioPresetLabel);
+    rightLayout->addWidget(ui.scenarioPresetCombo);
 
     // Checkboxes
-    auto* rowChecks = new QHBoxLayout();
-    rowChecks->addWidget(m_gridToggle);
-    rowChecks->addWidget(m_mapToggle);
-    rightLayout->addLayout(rowChecks);
-
-    m_modelParametersLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
-    rightLayout->addWidget(m_modelParametersLabel);
-    auto* rowSpinSection = new QHBoxLayout();
-    rowSpinSection->addStretch();
-    QSize spinBoxSize(Config::Layout::buttonWidth, Config::Layout::buttonHeight);
-    auto* betaGroup = new QVBoxLayout();
-    betaGroup->setSpacing(0);
-    m_betaSpin->setFixedSize(spinBoxSize);
-    m_betaLabel->setAlignment(Qt::AlignCenter);
-    betaGroup->addWidget(m_betaSpin);
-    betaGroup->addWidget(m_betaLabel);
-    rowSpinSection->addLayout(betaGroup);
-    rowSpinSection->addSpacing(Config::Layout::rowButtonsSpacing);
-    auto* gammaGroup = new QVBoxLayout();
-    gammaGroup->setSpacing(0);
-    m_gammaSpin->setFixedSize(spinBoxSize);
-    m_gammaLabel->setAlignment(Qt::AlignCenter);
-    gammaGroup->addWidget(m_gammaSpin);
-    gammaGroup->addWidget(m_gammaLabel);
-    rowSpinSection->addLayout(gammaGroup);
-    rowSpinSection->addSpacing(Config::Layout::rowButtonsSpacing);
-    auto* deltaGroup = new QVBoxLayout();
-    deltaGroup->setSpacing(0);
-    m_deltaSpin->setFixedSize(spinBoxSize);
-    m_deltaLabel->setAlignment(Qt::AlignCenter);
-    deltaGroup->addWidget(m_deltaSpin);
-    deltaGroup->addWidget(m_deltaLabel);
-    rowSpinSection->addLayout(deltaGroup);
-    rowSpinSection->addStretch();
-    rightLayout->addLayout(rowSpinSection);
+    auto* checksLayout = new QHBoxLayout();
+    checksLayout->addWidget(ui.gridToggle);
+    checksLayout->addWidget(ui.mapToggle);
+    rightLayout->addLayout(checksLayout);
 
     // Player settings
-    m_playerSettingsLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
-    rightLayout->addWidget(m_playerSettingsLabel);
-    rightLayout->addWidget(m_paintToggle);
-    auto* playerRadioLayout = new QHBoxLayout();
-    playerRadioLayout->addStretch();
-    playerRadioLayout->addWidget(m_sideARadio);
-    playerRadioLayout->addSpacing(Config::Layout::rowButtonsSpacing * 2);
-    playerRadioLayout->addWidget(m_sideBRadio);
-    playerRadioLayout->addStretch();
-    rightLayout->addLayout(playerRadioLayout);
-    rightLayout->addWidget(m_budgetLabel);
+    ui.playerSettingsLabel->setStyleSheet("font-weight: bold; font-size: 13px;");
+    rightLayout->addWidget(ui.playerSettingsLabel);
+    rightLayout->addWidget(ui.paintToggle);
+
+    // Player tabs
+    rightLayout->addWidget(ui.tabsWidget, 1);
 
     rightLayout->addStretch();
 
     // Cell info
-    m_cellInfoLabel->setFrameShape(QFrame::StyledPanel);
-    m_cellInfoLabel->setFrameShadow(QFrame::Plain);
-    m_cellInfoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    m_cellInfoLabel->setMinimumHeight(60);
-    m_cellInfoLabel->setWordWrap(true);
-    m_cellInfoLabel->setStyleSheet(
+    ui.cellInfoLabel->setFrameShape(QFrame::StyledPanel);
+    ui.cellInfoLabel->setFrameShadow(QFrame::Plain);
+    ui.cellInfoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    ui.cellInfoLabel->setMinimumHeight(60);
+    ui.cellInfoLabel->setWordWrap(true);
+    ui.cellInfoLabel->setStyleSheet(
         "color: black; border: 1px solid black; border-radius: 4px; padding: 1px;");
-    rightLayout->addWidget(m_cellInfoLabel);
+    rightLayout->addWidget(ui.cellInfoLabel);
 
-    // Grid/stats button
-    rightLayout->addWidget(m_toggleViewButton, 0, Qt::AlignCenter);
+    // Toggle view/physics button
+    auto* buttonsLayout = new QHBoxLayout();
+    buttonsLayout->addStretch();
+    buttonsLayout->addWidget(ui.toggleViewButton);
+    buttonsLayout->addWidget(ui.physicsButton);
+    buttonsLayout->addStretch();
+    rightLayout->addLayout(buttonsLayout);
 
-    // Iterations label
-    rightLayout->addWidget(m_iterationLabel, 0, Qt::AlignRight);
+    // Iteration label
+    rightLayout->addWidget(ui.iterationLabel, 0, Qt::AlignRight);
 
-    // FPS and zoom label
-    m_fpsLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    m_fpsLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
-    m_fpsLabel->setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
+    // Overlay styling
+    ui.fpsLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui.fpsLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    ui.fpsLabel->setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
 
-    m_zoomLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    m_zoomLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
-    m_zoomLabel->setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
+    ui.zoomLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui.zoomLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    ui.zoomLabel->setStyleSheet(
+        "background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
 
     updateOverlayLabelsPosition();
 
-    // Add right panel to main layout
     mainLayout->addWidget(right, Config::Layout::rightPanelStretch);
 }
 
-void MainWindow::wire()
+void MainWindow::wireAll()
 {
-    connect(m_gridWidget, &GridWidget::paintCellRequested, this,
-            [this](int x, int y, Side side)
-            {
-                m_simulation->cellAt(x, y).side = side;
-                m_gridWidget->update();
-            });
-    connect(m_startButton, &QPushButton::clicked, this, &MainWindow::onStartButtonClicked);
-    connect(m_resetButton, &QPushButton::clicked, this, &MainWindow::onResetButtonClicked);
-    connect(m_stepButton, &QPushButton::clicked, this, &MainWindow::onStepButtonClicked);
-    connect(m_simulationSpeedSlider, &QSlider::valueChanged, this,
+    wireSimulationControls();
+    wirePlayers();
+    wireGrid();
+    wireTogglesAndView();
+
+    connect(model.timer, &QTimer::timeout, this, [this] { doStep(); });
+}
+
+void MainWindow::wireSimulationControls()
+{
+    connect(ui.simulationControlWidget, &SimulationControlWidget::startRequested, this,
+            &MainWindow::onStartClicked);
+    connect(ui.simulationControlWidget, &SimulationControlWidget::resetRequested, this,
+            &MainWindow::onResetClicked);
+    connect(ui.simulationControlWidget, &SimulationControlWidget::stepRequested, this,
+            &MainWindow::onStepClicked);
+    connect(ui.simulationControlWidget, &SimulationControlWidget::speedChanged, this,
             &MainWindow::onSimulationSpeedChanged);
-    connect(m_gridToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setShowGrid);
-    connect(m_mapToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setMapMode);
-    connect(m_paintToggle, &QCheckBox::toggled, m_gridWidget, &GridWidget::setPaintMode);
-    connect(m_toggleViewButton, &QPushButton::toggled, this, &MainWindow::onToggleView);
-    connect(m_timer.get(), &QTimer::timeout, this, [this] { onStep(); });
-    connect(m_neighbourhoodCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+    connect(ui.simulationControlWidget, &SimulationControlWidget::neighbourhoodChanged, this,
             &MainWindow::onNeighbourhoodChanged);
-    connect(m_gridWidget, &GridWidget::zoomChanged, this,
+    connect(ui.physics, &WorldPhysicsWidget::parametersChanged, this,
+            [this]() { model.simulation->setParameters(ui.physics->getParameters()); });
+}
+
+void MainWindow::wirePlayers()
+{
+    auto syncPlayers = [this]()
+    {
+        auto pA = model.simulation->getPlayerA();
+        auto pB = model.simulation->getPlayerB();
+
+        pA.controls = ui.playerAWidget->getControls();
+        pB.controls = ui.playerBWidget->getControls();
+
+        model.simulation->setPlayers(pA, pB);
+
+        refreshBudgets();
+    };
+
+    connect(ui.playerAWidget, &PlayerControlWidget::controlsChanged, this, syncPlayers);
+    connect(ui.playerBWidget, &PlayerControlWidget::controlsChanged, this, syncPlayers);
+}
+
+void MainWindow::wireGrid()
+{
+    connect(ui.gridWidget, &GridWidget::zoomChanged, this,
             [this](double zoomFactor)
             {
                 int percent = static_cast<int>(zoomFactor * 100.0 + 0.5);
@@ -311,124 +281,182 @@ void MainWindow::wire()
                 {
                     percent = 100;
                 }
-                m_zoomLabel->setText(QStringLiteral("Zoom: %1%").arg(percent));
+                ui.zoomLabel->setText(QStringLiteral("Zoom: %1%").arg(percent));
                 updateOverlayLabelsPosition();
             });
-    connect(m_gridWidget, &GridWidget::cellInfoChanged, this,
-            [this](const QString& info)
+
+    connect(ui.gridWidget, &GridWidget::cellInfoChanged, this, [this](const QString& info)
+            { ui.cellInfoLabel->setText(info.isEmpty() ? QStringLiteral("Cell N/A") : info); });
+
+    connect(ui.gridWidget, &GridWidget::paintCellRequested, this,
+            [this](int x, int y, Side side)
             {
-                if (info.isEmpty())
-                {
-                    m_cellInfoLabel->setText(QStringLiteral("Cell: N/A"));
-                }
-                else
-                {
-                    m_cellInfoLabel->setText(info);
-                }
+                model.simulation->cellAt(x, y).side = side;
+                ui.gridWidget->update();
             });
+}
+
+void MainWindow::wireTogglesAndView()
+{
+    connect(ui.gridToggle, &QCheckBox::toggled, ui.gridWidget, &GridWidget::setShowGrid);
+    connect(ui.mapToggle, &QCheckBox::toggled, ui.gridWidget, &GridWidget::setMapMode);
+    connect(ui.paintToggle, &QCheckBox::toggled, ui.gridWidget, &GridWidget::setPaintMode);
+
+    connect(ui.toggleViewButton, &QPushButton::toggled, this, &MainWindow::onToggleView);
+}
+
+void MainWindow::applyDefaults()
+{
+    onSimulationSpeedChanged(ui.simulationControlWidget->getSpeed());
+    ui.simulationControlWidget->setNeighbourhood(0);
+
+    BaseParameters defaults;
+    defaults.wLocal = 1.0f;
+    defaults.wDM    = 1.0f;
+
+    ui.physics->setParameters(defaults);
+    model.simulation->setParameters(defaults);
+
+    model.simulation->setAllThreshold(0.3);
+
+    refreshBudgets();
+    updateIterationLabel();
+}
+
+void MainWindow::refreshBudgets()
+{
+    const auto pA = model.simulation->getPlayerA();
+    const auto pB = model.simulation->getPlayerB();
+
+    ui.playerAWidget->updateBudgetDisplay(pA.budget, pA.calculatePlannedCost());
+    ui.playerBWidget->updateBudgetDisplay(pB.budget, pB.calculatePlannedCost());
 }
 
 void MainWindow::updateIterationLabel()
 {
-    m_iterationLabel->setText(QStringLiteral("Iteration: %1").arg(m_simulation->getIteration()));
+    ui.iterationLabel->setText(
+        QStringLiteral("Iteration: %1").arg(model.simulation->getIteration()));
 }
 
 void MainWindow::countFps()
 {
-    ++m_fpsFrameCount;
-    const qint64 elapsedMs = m_fpsTimer.elapsed();
+    ++model.fpsFrameCount;
+    const qint64 elapsedMs = model.fpsTimer.elapsed();
     if (elapsedMs >= 1000)
     {
-        const int fpsInt = m_fpsFrameCount;
-        m_fpsLabel->setText(QStringLiteral("FPS: %1").arg(fpsInt));
+        ui.fpsLabel->setText(QStringLiteral("FPS: %1").arg(model.fpsFrameCount));
         updateOverlayLabelsPosition();
 
-        m_fpsFrameCount = 0;
-        m_fpsTimer.restart();
+        model.fpsFrameCount = 0;
+        model.fpsTimer.restart();
     }
 }
 
-void MainWindow::onStep()
+void MainWindow::updateOverlayLabelsPosition()
+{
+    if (not ui.gridWidget)
+    {
+        return;
+    }
+
+    if (ui.fpsLabel)
+    {
+        ui.fpsLabel->adjustSize();
+        ui.fpsLabel->move(Config::Layout::margin, Config::Layout::margin);
+        ui.fpsLabel->raise();
+    }
+
+    if (ui.zoomLabel)
+    {
+        ui.zoomLabel->adjustSize();
+        const int x = Config::Layout::margin;
+        const int y = ui.gridWidget->height() - ui.zoomLabel->height() - Config::Layout::margin;
+        ui.zoomLabel->move(x, y);
+        ui.zoomLabel->raise();
+    }
+}
+
+void MainWindow::doStep()
 {
     countFps();
 
-    m_simulation->step();
-    m_gridWidget->update();
-    updateIterationLabel();
+    model.simulation->step();
+    ui.gridWidget->update();
 
-    if (m_contentStack->currentIndex() == 1)
+    updateIterationLabel();
+    refreshBudgets();
+
+    if (ui.contentStack->currentIndex() == static_cast<int>(Page::Stats))
     {
         // updateStats(globalStep);
     }
 }
 
-void MainWindow::onStartButtonClicked()
+void MainWindow::onStartClicked()
 {
-    if (m_timer->isActive())
+    if (model.timer->isActive())
     {
-        m_timer->stop();
-        m_startButton->setText(QStringLiteral("Start"));
-
-        m_fpsLabel->setText(QStringLiteral("FPS: 0"));
-        updateOverlayLabelsPosition();
+        model.timer->stop();
+        ui.simulationControlWidget->updateState(false);
+        return;
     }
     else
     {
-        m_fpsFrameCount = 0;
-        m_fpsTimer.restart();
+        model.fpsFrameCount = 0;
+        model.fpsTimer.restart();
 
-        onSimulationSpeedChanged(m_simulationSpeedSlider->value());
-        m_timer->start();
-        m_startButton->setText(QStringLiteral("Pause"));
+        model.timer->start();
+        ui.simulationControlWidget->updateState(true);
     }
 }
 
-void MainWindow::onResetButtonClicked()
+void MainWindow::onResetClicked()
 {
-    m_timer->stop();
-    m_simulation->reset();
-    m_fpsLabel->setText(QStringLiteral("FPS: 0"));
+    model.timer->stop();
+    model.fpsFrameCount = 0;
+
+    model.simulation->reset();
+
+    ui.gridWidget->clearMap();
+    ui.gridWidget->resetView();
+    ui.gridWidget->update();
+
     updateOverlayLabelsPosition();
 
-    m_startButton->setText(QStringLiteral("Start"));
-    m_simulationSpeedSlider->setValue(Config::Timing::simulationSpeed);
-    m_gridWidget->clearMap();
-    m_gridWidget->resetView();
-    m_gridWidget->update();
-
     clearStats();
-    m_iterationLabel->setText(QStringLiteral("Iteration: 0"));
+
+    ui.fpsLabel->setText(QStringLiteral("FPS: 0"));
+    ui.iterationLabel->setText(QStringLiteral("Iteration: 0"));
+    ui.simulationControlWidget->updateState(false);
+
+    refreshBudgets();
 }
 
-void MainWindow::onStepButtonClicked()
+void MainWindow::onStepClicked()
 {
-    if (m_timer->isActive())
+    if (model.timer->isActive())
     {
-        m_timer->stop();
-        m_startButton->setText("Start");
-        m_fpsLabel->setText(QStringLiteral("FPS: 0"));
-        updateOverlayLabelsPosition();
+        model.timer->stop();
+        ui.simulationControlWidget->updateState(false);
     }
-    else
-    {
-        onStep();
-        m_fpsLabel->setText(QStringLiteral("FPS: 0"));
-        updateOverlayLabelsPosition();
-    }
+
+    doStep();
 }
 
 void MainWindow::onToggleView(bool checked)
 {
-    m_contentStack->setCurrentIndex(checked ? 1 : 0);
-    m_toggleViewButton->setText(checked ? QStringLiteral("Show simulation")
-                                        : QStringLiteral("Show stats"));
+    ui.contentStack->setCurrentIndex(checked ? static_cast<int>(Page::Stats)
+                                             : static_cast<int>(Page::Simulation));
+
+    ui.toggleViewButton->setText(checked ? QStringLiteral("Show simulation")
+                                         : QStringLiteral("Show stats"));
 }
 
 void MainWindow::onNeighbourhoodChanged(int index)
 {
     auto chosenNeighbourhoodType =
         (index == 0) ? NeighbourhoodType::VON_NEUMANN : NeighbourhoodType::MOORE;
-    m_simulation->setNeighbourhoodType(chosenNeighbourhoodType);
+    model.simulation->setNeighbourhoodType(chosenNeighbourhoodType);
 }
 
 void MainWindow::onSimulationSpeedChanged(int speed)
@@ -439,7 +467,7 @@ void MainWindow::onSimulationSpeedChanged(int speed)
     float t           = static_cast<float>(speed) / 100.0f;
     int   newInterval = static_cast<int>(slowInterval + t * (fastInterval - slowInterval));
 
-    m_timer->setInterval(newInterval);
+    model.timer->setInterval(newInterval);
 }
 
 void MainWindow::setupStats()
@@ -452,30 +480,4 @@ void MainWindow::updateStats(int globalStep)
 
 void MainWindow::clearStats()
 {
-}
-
-void MainWindow::updateOverlayLabelsPosition()
-{
-    if (not m_gridWidget)
-    {
-        return;
-    }
-
-    if (m_fpsLabel)
-    {
-        m_fpsLabel->adjustSize();
-        const int x = Config::Layout::margin;
-        const int y = Config::Layout::margin;
-        m_fpsLabel->move(x, y);
-        m_fpsLabel->raise();
-    }
-
-    if (m_zoomLabel)
-    {
-        m_zoomLabel->adjustSize();
-        const int x = Config::Layout::margin;
-        const int y = m_gridWidget->height() - m_zoomLabel->height() - Config::Layout::margin;
-        m_zoomLabel->move(x, y);
-        m_zoomLabel->raise();
-    }
 }

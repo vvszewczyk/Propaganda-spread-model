@@ -23,6 +23,9 @@ class Simulation
         [[nodiscard]] int getCols() const;
         [[nodiscard]] int getRows() const;
 
+        [[nodiscard]] Player getPlayerA() const;
+        [[nodiscard]] Player getPlayerB() const;
+
         [[nodiscard]] CellData&       cellAt(int x, int y);
         [[nodiscard]] const CellData& cellAt(int x, int y) const;
 

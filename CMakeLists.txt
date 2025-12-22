@@ -14,13 +14,18 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Svg)
 add_executable(PropagandaSpreadModel
   src/main.cpp
   src/MainWindow.cpp
+  src/SimulationControlWidget.cpp
+  src/WorldPhysicsWidget.cpp
+  src/PlayerControlWidget.cpp
   src/UsMap.cpp
   src/Simulation.cpp
   src/GridWidget.cpp
   src/Constants.cpp
   include/MainWindow.hpp
-  #include/UsMap.hpp
   include/GridWidget.hpp
+  include/SimulationControlWidget.hpp
+  include/WorldPhysicsWidget.hpp
+  include/PlayerControlWidget.hpp
 )
 target_include_directories(PropagandaSpreadModel PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(PropagandaSpreadModel PRIVATE Qt6::Widgets Qt6::Charts Qt6::Svg)

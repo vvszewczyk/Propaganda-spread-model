@@ -10,8 +10,9 @@ enum class Side : uint8_t
 
 enum class NeighbourhoodType : uint8_t
 {
-    MOORE,
-    VON_NEUMANN
+    VON_NEUMANN = 0,
+    MOORE       = 1
+
 };
 
 struct CellData

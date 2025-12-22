@@ -76,6 +76,16 @@ int Simulation::getRows() const
     return m_rows;
 }
 
+Player Simulation::getPlayerA() const
+{
+    return m_playerA;
+}
+
+Player Simulation::getPlayerB() const
+{
+    return m_playerB;
+}
+
 void Simulation::reset()
 {
     m_currentGrid =
