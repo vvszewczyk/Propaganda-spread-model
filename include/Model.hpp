@@ -12,17 +12,23 @@
 
 struct BaseParameters
 {
+        float broadcastDecay         = 0.02f; // 2% wygaszenia/iterację (dobierzesz)
+        float broadcastNeutralWeight = 0.2f;  // jak mocno broadcast wpływa neutralnych (perswazja)
+        float broadcastHysGain  = 0.02f; // jak mocno broadcast wzmacnia histerezę zwolenników
+        float broadcastHysMax   = 2.0f;  // clamp, żeby histereza nie urosła w kosmos
+        float broadcastStockMax = 1.0f;
+
         float wBroadcast = 0.0f, wSocial = 0.0f,
               wDM = 0.0f; // wagi ile "warte" są poszczególne kanały (Broadcast, Social, DM) w
                           // obliczaniu ekspozycji, jak bardzo społeczeństwo ufa danemu medium
         float wLocal =
-            1.0f; // waga lokalnych sąsiadów (ile "warci" są sąsiedzi w danym sąsiedztwie)
+            0.0f; // waga lokalnych sąsiadów (ile "warci" są sąsiedzi w danym sąsiedztwie)
 
-        float thetaScale = 1.0f; // Próg decyzji: ile trzeba "pola" żeby neutralny wszedł w A/B
+        float thetaScale = 0.2f; // Próg decyzji: ile trzeba "pola" żeby neutralny wszedł w A/B
         float margin     = 0.0f; // Margines przewagi (żeby remisy nie powodowały fluktuacji)
 
         // Histereza (utrudnia zmianę A<->B)
-        float switchKappa = 1.0f;  // κ: jak histereza podbija próg zmiany strony
+        float switchKappa = 0.5f;  // κ: jak histereza podbija próg zmiany strony
         float hysGrow     = 0.02f; // jak szybko rośnie histereza przy zgodnych bodźcach
         float hysDecay    = 0.01f; // jak szybko zanika bez wsparcia
 };
@@ -43,7 +49,7 @@ struct Player
 {
         Controls controls; // "pokrętła" jak mocno dana strona używa danego kanału/koloru propagandy
                            // w danym kroku, inaczej intensywność sygnału
-        float  budget    = 0.0f; // budżet jaki gracz może przeznaczyć na kampanię
+        float  budget    = 1000.0f; // budżet jaki gracz może przeznaczyć na kampanię
         double costWhite = 1.0, costGrey = 2.0, costBlack = 3.0;
 
         [[nodiscard]] float calculatePlannedCost() const
@@ -57,11 +63,14 @@ struct Player
         }
 };
 
-struct GlobalSignals // przeliczone sygnały "kto krzyczy głośniej" + dla A, - dla B
+struct GlobalSignals
 {
-        float broadcastPressure = 0.0f;
-        float socialPressure    = 0.0f;
-        float dmPressure        = 0.0f;
+        float broadcastA = 0.0f;
+        float broadcastB = 0.0f;
 
-        [[nodiscard]] float sum() const { return broadcastPressure + socialPressure + dmPressure; }
+        float socialPressure = 0.0f;
+        float dmPressure     = 0.0f;
+
+        [[nodiscard]] float broadcastBias() const { return broadcastA - broadcastB; }
+        [[nodiscard]] float sumDMSocial() const { return socialPressure + dmPressure; }
 };

@@ -245,10 +245,11 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
 
     if (!m_mapMode)
     {
-        const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\nHysteresis=%4")
+        const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\nThreshold=%4\nHysteresis=%5")
                                  .arg(cell.x())
                                  .arg(cell.y())
                                  .arg(stateStr)
+                                 .arg(cellData.threshold, 0, 'f', 2)
                                  .arg(cellData.hysteresis, 0, 'f', 2);
 
         emit cellInfoChanged(info);
@@ -264,12 +265,14 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
 
     const QString usState = tooltipTextForState(stateId);
 
-    const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\n(%4)\nHysteresis=%5")
-                             .arg(cell.x())
-                             .arg(cell.y())
-                             .arg(stateStr)
-                             .arg(usState)
-                             .arg(cellData.hysteresis, 0, 'f', 2);
+    const QString info =
+        QStringLiteral("Cell (%1, %2):\nState=%3\n(%4)\nnHysteresis=%4\nThreshold=%5")
+            .arg(cell.x())
+            .arg(cell.y())
+            .arg(stateStr)
+            .arg(usState)
+            .arg(cellData.threshold, 0, 'f', 2)
+            .arg(cellData.hysteresis, 0, 'f', 2);
 
     emit cellInfoChanged(info);
 }

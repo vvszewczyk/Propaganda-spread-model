@@ -38,7 +38,7 @@ namespace app::ui
                     std::unique_ptr<Simulation> simulation;
                     QTimer*                     timer{};
                     QElapsedTimer               fpsTimer;
-                    int                         fpsFrameCount{0};
+                    int                         fpsFrameCount{};
             } model;
 
             struct ui

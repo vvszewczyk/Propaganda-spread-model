@@ -28,11 +28,6 @@ namespace
         return white * Config::Simulation::kEffWhite + grey * Config::Simulation::kEffGray +
                black * Config::Simulation::kEffBlack;
     }
-
-    inline float clamp(float x)
-    {
-        return std::max(0.0f, std::min(1.0f, x));
-    }
 } // namespace
 
 Simulation::Simulation(int cols, int rows)
@@ -93,8 +88,11 @@ void Simulation::reset()
     m_nextGrid =
         std::vector<CellData>(static_cast<std::size_t>(m_cols) * static_cast<std::size_t>(m_rows));
     m_iteration = 0;
+
+    m_broadcastStockA = 0.0f;
+    m_broadcastStockB = 0.0f;
+
     seedRandomly(500, 500);
-    setAllThreshold(0.3);
 }
 
 CellData& Simulation::cellAt(int x, int y)
@@ -114,17 +112,22 @@ const CellData& Simulation::cellAt(int x, int y) const
     return m_currentGrid.at(index);
 }
 
-void Simulation::setAllThreshold(double t)
+void Simulation::setThresholdRandomly()
 {
-    for (auto& c : m_currentGrid)
-        c.threshold = t;
-    for (auto& c : m_nextGrid)
-        c.threshold = t;
+    std::uniform_real_distribution<double> distTheta(0.05, 0.6);
+
+    for (auto& cell : m_currentGrid)
+    {
+        cell.threshold = distTheta(m_rng);
+    }
+    for (std::size_t i = 0; i < m_nextGrid.size(); ++i)
+    {
+        m_nextGrid[i].threshold = m_currentGrid[i].threshold;
+    }
 }
 
 void Simulation::seedRandomly(int countA, int countB)
 {
-    std::mt19937                       rng{std::random_device{}()};
     std::uniform_int_distribution<int> distX(0, m_cols - 1);
     std::uniform_int_distribution<int> distY(0, m_rows - 1);
 
@@ -133,8 +136,8 @@ void Simulation::seedRandomly(int countA, int countB)
         int placed = 0;
         while (placed < count)
         {
-            int x = distX(rng);
-            int y = distY(rng);
+            int x = distX(m_rng);
+            int y = distY(m_rng);
 
             CellData& cell = cellAt(x, y);
             if (not cell.active)
@@ -154,6 +157,8 @@ void Simulation::seedRandomly(int countA, int countB)
     };
     place(Side::A, countA);
     place(Side::B, countB);
+
+    setThresholdRandomly();
 }
 
 GlobalSignals Simulation::calculateCampaignImpact()
@@ -183,7 +188,17 @@ GlobalSignals Simulation::calculateCampaignImpact()
     const float bB = computeChannelStrength(controlsB.whiteBroadcast,
                                              controlsB.greyBroadcast,
                                             controlsB.blackBroadcast) * scaleB;
-    globalSignals.broadcastPressure = m_parameters.wBroadcast * (bA - bB);
+    //globalSignals.broadcastPressure = m_parameters.wBroadcast * (bA - bB);
+
+    m_broadcastStockA *= (1.0f - m_parameters.broadcastDecay);
+    m_broadcastStockB *= (1.0f - m_parameters.broadcastDecay);
+    m_broadcastStockA += bA;
+    m_broadcastStockB += bB;
+    m_broadcastStockA = std::clamp(m_broadcastStockA, 0.0f, m_parameters.broadcastStockMax);
+    m_broadcastStockB = std::clamp(m_broadcastStockB, 0.0f, m_parameters.broadcastStockMax);
+    globalSignals.broadcastA = m_parameters.wBroadcast * m_broadcastStockA;
+    globalSignals.broadcastB = m_parameters.wBroadcast * m_broadcastStockB;
+
 
     // Social
     float sA = computeChannelStrength(controlsA.whiteSocial,
@@ -209,9 +224,9 @@ GlobalSignals Simulation::calculateCampaignImpact()
     return globalSignals;
 }
 
-float Simulation::calculateLocalPressure(int x, int y) const
+float Simulation::calculateNeighbourInfluence(int x, int y) const
 {
-    auto idx = [&](int xn, int yn) -> std::size_t
+    auto idx = [&](int xn, int yn)
     {
         return static_cast<std::size_t>(yn) * static_cast<std::size_t>(m_cols) +
                static_cast<std::size_t>(xn);
@@ -248,6 +263,46 @@ float Simulation::calculateLocalPressure(int x, int y) const
     }
 
     return (count == 0) ? 0.0f : hDM / static_cast<float>(count);
+}
+
+float Simulation::calculateDMInfluence(int x, int y, const GlobalSignals& globalSignals) const
+{
+    const float neighborsInfluence = calculateNeighbourInfluence(x, y);
+    return (neighborsInfluence * m_parameters.wLocal) + globalSignals.dmPressure;
+}
+
+float Simulation::calculateSocialPressure(const GlobalSignals& globalSignals) const
+{
+    return globalSignals.socialPressure;
+}
+
+float Simulation::applyBroadcastPersuasionForNeutrals(const CellData&      currentCell,
+                                                      float                baseH,
+                                                      const GlobalSignals& globalSignals) const
+{
+    if (currentCell.side == Side::NONE)
+    {
+        return baseH + (m_parameters.broadcastNeutralWeight * globalSignals.broadcastBias());
+    }
+
+    return baseH;
+}
+
+void Simulation::applyBroadcastReinforcementForSupporters(const CellData&      currentCell,
+                                                          CellData&            nextCell,
+                                                          const GlobalSignals& globalSignals) const
+{
+    if (nextCell.side != Side::NONE and nextCell.side == currentCell.side)
+    {
+        const float chosenSignalStrength =
+            (nextCell.side == Side::A) ? globalSignals.broadcastA : globalSignals.broadcastB;
+
+        const double boost =
+            static_cast<double>(m_parameters.broadcastHysGain * chosenSignalStrength);
+
+        nextCell.hysteresis = std::min<double>(static_cast<double>(m_parameters.broadcastHysMax),
+                                               nextCell.hysteresis + boost);
+    }
 }
 
 void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell, float h)
@@ -335,9 +390,15 @@ void Simulation::step()
                 continue;
             }
 
-            const float localPressure = calculateLocalPressure(x, y);
-            float totalInfluence      = (localPressure * m_parameters.wLocal) + globalSignals.sum();
-            updateCellState(currentCell, nextCell, totalInfluence);
+            const float dmPressure     = calculateDMInfluence(x, y, globalSignals);
+            const float socialPressure = calculateSocialPressure(globalSignals);
+            const float baseH          = dmPressure + socialPressure;
+
+            const float h = applyBroadcastPersuasionForNeutrals(currentCell, baseH, globalSignals);
+
+            updateCellState(currentCell, nextCell, h);
+
+            applyBroadcastReinforcementForSupporters(currentCell, nextCell, globalSignals);
         }
     }
     m_currentGrid.swap(m_nextGrid);

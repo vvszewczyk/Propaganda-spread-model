@@ -59,10 +59,10 @@ void MainWindow::createWidgets()
     ui.physics = new WorldPhysicsWidget(this);
 
     ui.tabsWidget    = new QTabWidget(this);
-    ui.playerAWidget = new PlayerControlWidget("Side A", this);
-    ui.playerBWidget = new PlayerControlWidget("Side B", this);
-    ui.tabsWidget->addTab(ui.playerAWidget, "Player A");
-    ui.tabsWidget->addTab(ui.playerBWidget, "Player B");
+    ui.playerAWidget = new PlayerControlWidget(Config::UiText::sideA, this);
+    ui.playerBWidget = new PlayerControlWidget(Config::UiText::sideB, this);
+    ui.tabsWidget->addTab(ui.playerAWidget, Config::UiText::playerA);
+    ui.tabsWidget->addTab(ui.playerBWidget, Config::UiText::playerB);
 
     ui.scenarioPresetLabel = makeWidget<QLabel>(this, nullptr, Config::UiText::scenarioPreset);
     ui.scenarioPresetCombo = makeWidget<QComboBox>(
@@ -311,13 +311,13 @@ void MainWindow::applyDefaults()
     ui.simulationControlWidget->setNeighbourhood(0);
 
     BaseParameters defaults;
-    defaults.wLocal = 1.0f;
+    defaults.wLocal = 0.0f;
     defaults.wDM    = 1.0f;
 
     ui.physics->setParameters(defaults);
     model.simulation->setParameters(defaults);
 
-    model.simulation->setAllThreshold(0.3);
+    // model.simulation->setAllThreshold(0.3);
 
     refreshBudgets();
     updateIterationLabel();

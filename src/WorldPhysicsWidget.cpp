@@ -27,8 +27,8 @@ WorldPhysicsWidget::WorldPhysicsWidget(QWidget* parent) : QWidget(parent)
     layout->addSpacing(5);
     layout->addWidget(new QLabel("<b>Inertia & Memory</b>"));
 
-    // Kappa: 0-50 /10 => 0.0..5.0
-    addParamSlider(layout, "Loyalty (Kappa)", m_slKappa, 0, 50, 10, 10.0, 2,
+    // Kappa: 0-20 /10 => 0.0..5.0
+    addParamSlider(layout, "Loyalty (Kappa)", m_slKappa, 0, 20, 1, 10.0, 2,
                    "Multiplier for resistance when a side is already chosen.");
 
     // Grow/Decay: /1000 => 0.000..0.100
@@ -42,17 +42,17 @@ WorldPhysicsWidget::WorldPhysicsWidget(QWidget* parent) : QWidget(parent)
     layout->addSpacing(5);
     layout->addWidget(new QLabel("<b>Channel Trust Weights</b>"));
 
-    // Weights: /100 => 0.00..3.00
-    addParamSlider(layout, "Local (Neighbors)", m_slWLocal, 0, 300, 100, 100.0, 2,
+    // Weights: /100 => 0.00..1.00
+    addParamSlider(layout, "Local (Neighbors)", m_slWLocal, 0, 100, 100, 100.0, 2,
                    "Impact of neighbors.");
 
-    addParamSlider(layout, "Broadcast (Media)", m_slWBroadcast, 0, 300, 100, 100.0, 2,
+    addParamSlider(layout, "Broadcast (Media)", m_slWBroadcast, 0, 100, 100, 100.0, 2,
                    "Impact of global media.");
 
-    addParamSlider(layout, "Social (Net)", m_slWSocial, 0, 300, 100, 100.0, 2,
+    addParamSlider(layout, "Social (Net)", m_slWSocial, 0, 100, 100, 100.0, 2,
                    "Impact of social network.");
 
-    addParamSlider(layout, "Direct (Ads)", m_slWDM, 0, 300, 100, 100.0, 2,
+    addParamSlider(layout, "Direct (Ads)", m_slWDM, 0, 100, 100, 100.0, 2,
                    "Impact of targeted campaigns.");
     layout->addStretch();
 }
@@ -71,7 +71,6 @@ void WorldPhysicsWidget::addParamSlider(QVBoxLayout*   layout,
     lbl->setToolTip(tooltip);
     layout->addWidget(lbl);
 
-    // wiersz: [slider...............] [value]
     auto* row = new QHBoxLayout();
     row->setContentsMargins(0, 0, 0, 0);
 
@@ -82,8 +81,6 @@ void WorldPhysicsWidget::addParamSlider(QVBoxLayout*   layout,
                                         s->setRange(min, max);
                                         s->setValue(defaultVal);
                                         s->setToolTip(tooltip);
-
-                                        // opcjonalnie: ticki
                                         s->setTickPosition(QSlider::TicksBelow);
                                         s->setTickInterval(std::max(1, (max - min) / 4));
                                     });

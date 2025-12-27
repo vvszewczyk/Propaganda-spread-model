@@ -15,7 +15,7 @@ class Simulation
         void setNeighbourhoodType(NeighbourhoodType type);
         void reset();
         void seedRandomly(int countA, int countB);
-        void setAllThreshold(double);
+        void setThresholdRandomly();
 
         void step();
 
@@ -31,10 +31,17 @@ class Simulation
 
     private:
         [[nodiscard]] GlobalSignals calculateCampaignImpact();
-        [[nodiscard]] float         calculateLocalPressure(int x, int y) const;
+        [[nodiscard]] float         calculateNeighbourInfluence(int x, int y) const;
+        [[nodiscard]] float
+        calculateDMInfluence(int x, int y, const GlobalSignals& globalSignals) const;
+        [[nodiscard]] float calculateSocialPressure(const GlobalSignals& globalSignals) const;
+        [[nodiscard]] float applyBroadcastPersuasionForNeutrals(
+            const CellData& currentCell, float baseH, const GlobalSignals& globalSignals) const;
+
+        void applyBroadcastReinforcementForSupporters(const CellData&      currentCell,
+                                                      CellData&            nextCell,
+                                                      const GlobalSignals& globalSignals) const;
         void updateCellState(const CellData& currentCell, CellData& nextCell, float h);
-        static float
-        calculateEffectiveSignal(const Controls& controls, float scale, const Player& player);
 
     private:
         int                   m_cols;
@@ -43,9 +50,13 @@ class Simulation
         std::vector<CellData> m_nextGrid;
         int                   m_iteration{0};
 
-        BaseParameters    m_parameters{};
-        Player            m_playerA{};
-        Player            m_playerB{};
+        BaseParameters m_parameters{};
+        Player         m_playerA{};
+        Player         m_playerB{};
+
+        float m_broadcastStockA = 0.0f;
+        float m_broadcastStockB = 0.0f;
+
         NeighbourhoodType m_neighbourhoodType{};
 
         std::mt19937 m_rng;

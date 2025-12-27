@@ -55,18 +55,16 @@ namespace Config
         inline const QString scenarioPreset    = QStringLiteral("Scenario preset:");
         inline const QString scenario1         = QStringLiteral("Scenario 1");
         inline const QString modelParameters   = QStringLiteral("Model parameters");
-        inline const QString beta              = QStringLiteral("β₀");
-        inline const QString gamma             = QStringLiteral("γ₀");
-        inline const QString delta             = QStringLiteral("δ₀");
         inline const QString playerSettings    = QStringLiteral("Player Settings");
         inline const QString playerA           = QStringLiteral("Player A");
         inline const QString playerB           = QStringLiteral("Player B");
+        inline const QString sideA             = QStringLiteral("Side A");
+        inline const QString sideB             = QStringLiteral("Side B");
         inline const QString budget            = QStringLiteral("Budget: ");
         inline const QString cost              = QStringLiteral("Cost: ");
         inline const QString useMap            = QStringLiteral("Use map");
         inline const QString paintMode         = QStringLiteral("Paint mode");
         inline const QString physics           = QStringLiteral("Physics");
-
     } // namespace UiText
 
     namespace UiValues
