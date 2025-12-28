@@ -4,6 +4,7 @@
 #include "Model.hpp"
 #include "Types.hpp"
 
+#include <QDebug>
 #include <algorithm>
 #include <random>
 #include <span>
@@ -282,7 +283,12 @@ float Simulation::applyBroadcastPersuasionForNeutrals(const CellData&      curre
 {
     if (currentCell.side == Side::NONE)
     {
-        return baseH + (m_parameters.broadcastNeutralWeight * globalSignals.broadcastBias());
+        const float stockMax   = std::max(1e-6f, m_parameters.broadcastStockMax);
+        float       biasNorm   = globalSignals.broadcastBias() / stockMax;
+        biasNorm               = std::clamp(biasNorm, -1.0f, 1.0f);
+        constexpr float kAlpha = 3.0f; // 2.0 - 6.0
+        const float     shaped = std::tanh(kAlpha * biasNorm);
+        return baseH + (m_parameters.broadcastNeutralWeight * shaped);
     }
 
     return baseH;
@@ -402,5 +408,27 @@ void Simulation::step()
         }
     }
     m_currentGrid.swap(m_nextGrid);
+    if (m_iteration % 50 == 0)
+    {
+        qDebug().noquote() << "iter" << m_iteration << "\n"
+                           << " Broadcast:\n"
+                           << "  decay =" << m_parameters.broadcastDecay << "\n"
+                           << "  neutralWeight =" << m_parameters.broadcastNeutralWeight << "\n"
+                           << "  hysGain =" << m_parameters.broadcastHysGain << "\n"
+                           << "  hysMax =" << m_parameters.broadcastHysMax << "\n"
+                           << "  stockMax =" << m_parameters.broadcastStockMax << "\n"
+                           << " Weights:\n"
+                           << "  wBroadcast =" << m_parameters.wBroadcast << "\n"
+                           << "  wSocial =" << m_parameters.wSocial << "\n"
+                           << "  wDM =" << m_parameters.wDM << "\n"
+                           << "  wLocal =" << m_parameters.wLocal << "\n"
+                           << " Decision:\n"
+                           << "  thetaScale =" << m_parameters.thetaScale << "\n"
+                           << "  margin =" << m_parameters.margin << "\n"
+                           << " Hysteresis:\n"
+                           << "  switchKappa =" << m_parameters.switchKappa << "\n"
+                           << "  hysGrow =" << m_parameters.hysGrow << "\n"
+                           << "  hysDecay =" << m_parameters.hysDecay;
+    }
     ++m_iteration;
 }

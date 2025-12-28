@@ -120,7 +120,7 @@ void MainWindow::setupPhysicsDock()
 
     ui.physicsDock->hide();
     ui.physicsDock->setFloating(true);
-    ui.physicsDock->resize(420, 600);
+    ui.physicsDock->resize(520, 800);
     ui.physicsDock->move(this->geometry().center() - QPoint(210, 300));
 
     connect(ui.physicsButton, &QPushButton::toggled, this,
@@ -310,14 +310,7 @@ void MainWindow::applyDefaults()
     onSimulationSpeedChanged(ui.simulationControlWidget->getSpeed());
     ui.simulationControlWidget->setNeighbourhood(0);
 
-    BaseParameters defaults;
-    defaults.wLocal = 0.0f;
-    defaults.wDM    = 1.0f;
-
-    ui.physics->setParameters(defaults);
-    model.simulation->setParameters(defaults);
-
-    // model.simulation->setAllThreshold(0.3);
+    model.simulation->setParameters(ui.physics->getParameters());
 
     refreshBudgets();
     updateIterationLabel();

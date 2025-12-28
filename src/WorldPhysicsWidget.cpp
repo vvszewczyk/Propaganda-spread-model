@@ -2,6 +2,8 @@
 
 #include "UiUtils.hpp"
 
+#include <QFont>
+#include <QLabel>
 #include <QToolTip>
 
 using namespace app::ui;
@@ -12,48 +14,68 @@ WorldPhysicsWidget::WorldPhysicsWidget(QWidget* parent) : QWidget(parent)
     layout->setContentsMargins(5, 10, 5, 5);
     layout->setSpacing(8);
 
-    // Sekcja 1: Podatność tłumu
-    layout->addWidget(new QLabel("<b>Social Resilience</b>"));
+    auto addHeader = [&](const QString& text)
+    {
+        auto* lbl  = new QLabel(text, this);
+        QFont font = lbl->font();
+        font.setBold(true);
+        font.setPointSize(font.pointSize() + 1);
+        lbl->setFont(font);
+        lbl->setStyleSheet("margin-top: 10px; margin-bottom: 2px;");
+        layout->addWidget(lbl);
+    };
 
-    // Theta: 10-200 /100 => 0.10..2.00
-    addParamSlider(layout, "Resistance (Theta)", m_slTheta, 10, 200, 100, 100.0, 2,
-                   "Higher values make people harder to convince.");
+    addHeader("Model Interactions");
 
-    // Margin: 0-20 /100 => 0.00..0.20
-    addParamSlider(layout, "Stability Margin", m_slMargin, 0, 20, 5, 100.0, 2,
-                   "Prevents flickering when forces are equal.");
+    addParamSlider(layout, "wLocal (Neighbor Weight)", m_wLocalSlider, 0, 200, 120, 100.0, 2,
+                   "Influence of neighbors (DM). Range: 0..2.0");
 
-    // Sekcja 2: Histereza (Pamięć)
-    layout->addSpacing(5);
-    layout->addWidget(new QLabel("<b>Inertia & Memory</b>"));
+    addParamSlider(layout, "thetaScale (Susceptibility)", m_thetaSlider, 20, 200, 100, 100.0, 2,
+                   "Scales the cell threshold. Range: 0.2..2.0");
 
-    // Kappa: 0-20 /10 => 0.0..5.0
-    addParamSlider(layout, "Loyalty (Kappa)", m_slKappa, 0, 20, 1, 10.0, 2,
-                   "Multiplier for resistance when a side is already chosen.");
+    addParamSlider(layout, "margin (Indifference Zone)", m_marginSlider, 0, 20, 5, 100.0, 2,
+                   "Stability control: larger margin means fewer state flips. Range: 0..0.20");
 
-    // Grow/Decay: /1000 => 0.000..0.100
-    addParamSlider(layout, "Memory Growth", m_slHysGrow, 0, 100, 20, 1000.0, 3,
-                   "How fast loyalty grows when exposed to same narrative.");
+    addHeader("Channel Weights");
 
-    addParamSlider(layout, "Memory Decay", m_slHysDecay, 0, 100, 10, 1000.0, 3,
-                   "How fast loyalty fades without reinforcement.");
+    addParamSlider(layout, "wDM (Self Confidence)", m_wDMSlider, 0, 100, 25, 100.0, 2,
+                   "Confidence in own decision. Range: 0..1.0");
 
-    // Sekcja 3: Zaufanie do kanałów
-    layout->addSpacing(5);
-    layout->addWidget(new QLabel("<b>Channel Trust Weights</b>"));
+    addParamSlider(layout, "wBroadcast (Media Confidence)", m_wBroadcastSlider, 0, 100, 20, 100.0,
+                   2, "Confidence in global broadcast/media. Range: 0..1.0");
 
-    // Weights: /100 => 0.00..1.00
-    addParamSlider(layout, "Local (Neighbors)", m_slWLocal, 0, 100, 100, 100.0, 2,
-                   "Impact of neighbors.");
+    addParamSlider(layout, "wSocial (Social Network)", m_wSocialSlider, 0, 100, 0, 100.0, 2,
+                   "Confidence in social connections. Range: 0..1.0 (Keep 0 if no graph)");
 
-    addParamSlider(layout, "Broadcast (Media)", m_slWBroadcast, 0, 100, 100, 100.0, 2,
-                   "Impact of global media.");
+    addHeader("Hysteresis");
 
-    addParamSlider(layout, "Social (Net)", m_slWSocial, 0, 100, 100, 100.0, 2,
-                   "Impact of social network.");
+    addParamSlider(layout, "switchKappa (Resistance)", m_kappaSlider, 0, 200, 50, 100.0, 2,
+                   "Resistance to change (Switch Kappa). Range: 0..2.0");
 
-    addParamSlider(layout, "Direct (Ads)", m_slWDM, 0, 100, 100, 100.0, 2,
-                   "Impact of targeted campaigns.");
+    addParamSlider(layout, "hysGrow (Reinforcement)", m_hysGrowSlider, 0, 50, 20, 1000.0, 3,
+                   "Rate of opinion hardening. Range: 0..0.050");
+
+    addParamSlider(layout, "hysDecay (Forgetting)", m_hysDecaySlider, 0, 50, 10, 1000.0, 3,
+                   "Rate of opinion decay. Range: 0..0.050");
+
+    // --- GROUP 4: Broadcast Mechanics ---
+    addHeader("Broadcast Mechanics");
+
+    addParamSlider(layout, "broadcastDecay (Exposure Decay)", m_broadcastDecaySlider, 0, 200, 20,
+                   1000.0, 3, "Range: 0..0.200");
+
+    addParamSlider(layout, "broadcastStockMax (Max Exposure)", m_broadcastStockMaxSlider, 50, 300,
+                   100, 100.0, 2, "Range: 0.5..3.0");
+
+    addParamSlider(layout, "broadcastHysGain (Hysteresis Gain)", m_broadcastHysGain, 0, 50, 20,
+                   1000.0, 3, "Reinforcement from media. Range: 0..0.050");
+
+    addParamSlider(layout, "broadcastHysMax (Hysteresis Limit)", m_broadcastHysMax, 0, 500, 200,
+                   100.0, 2, "Limit of reinforcement from media. Range: 0..5.0");
+
+    addParamSlider(layout, "broadcastNeutralWeight", m_broadcastNeutralWeight, 0, 100, 15, 100, 2,
+                   "");
+
     layout->addStretch();
 }
 
@@ -117,17 +139,23 @@ BaseParameters WorldPhysicsWidget::getParameters() const
 {
     BaseParameters p;
 
-    p.thetaScale = static_cast<float>(m_slTheta->value()) / 100.0f;
-    p.margin     = static_cast<float>(m_slMargin->value()) / 100.0f;
+    p.wLocal     = static_cast<float>(m_wLocalSlider->value()) / 100.f;
+    p.thetaScale = static_cast<float>(m_thetaSlider->value()) / 100.f;
+    p.margin     = static_cast<float>(m_marginSlider->value()) / 100.f;
 
-    p.switchKappa = static_cast<float>(m_slKappa->value()) / 10.0f;
-    p.hysGrow     = static_cast<float>(m_slHysGrow->value()) / 1000.0f;
-    p.hysDecay    = static_cast<float>(m_slHysDecay->value()) / 1000.0f;
+    p.wDM        = static_cast<float>(m_wDMSlider->value()) / 100.f;
+    p.wBroadcast = static_cast<float>(m_wBroadcastSlider->value()) / 100.f;
+    p.wSocial    = static_cast<float>(m_wSocialSlider->value()) / 100.f;
 
-    p.wLocal     = static_cast<float>(m_slWLocal->value()) / 100.0f;
-    p.wBroadcast = static_cast<float>(m_slWBroadcast->value()) / 100.0f;
-    p.wSocial    = static_cast<float>(m_slWSocial->value()) / 100.0f;
-    p.wDM        = static_cast<float>(m_slWDM->value()) / 100.0f;
+    p.switchKappa = static_cast<float>(m_kappaSlider->value()) / 100.f;
+    p.hysGrow     = static_cast<float>(m_hysGrowSlider->value()) / 1000.f;
+    p.hysDecay    = static_cast<float>(m_hysDecaySlider->value()) / 1000.f;
+
+    p.broadcastDecay         = static_cast<float>(m_broadcastDecaySlider->value()) / 1000.f;
+    p.broadcastStockMax      = static_cast<float>(m_broadcastStockMaxSlider->value()) / 100.f;
+    p.broadcastHysGain       = static_cast<float>(m_broadcastHysGain->value()) / 1000.f;
+    p.broadcastHysMax        = static_cast<float>(m_broadcastHysMax->value()) / 100.f;
+    p.broadcastNeutralWeight = static_cast<float>(m_broadcastNeutralWeight->value()) / 100.f;
 
     return p;
 }
@@ -136,8 +164,10 @@ void WorldPhysicsWidget::updateAllValueLabels()
 {
     for (const auto& b : m_bindings)
     {
-        if (!b.slider || !b.valueLabel)
+        if (not b.slider || not b.valueLabel)
+        {
             continue;
+        }
         const double scaled = static_cast<double>(b.slider->value()) / b.denom;
         b.valueLabel->setText(QString::number(scaled, 'f', b.decimals));
     }
@@ -147,17 +177,23 @@ void WorldPhysicsWidget::setParameters(const BaseParameters& p)
 {
     const bool wasBlocked = this->blockSignals(true);
 
-    m_slTheta->setValue(static_cast<int>(p.thetaScale * 100.0f));
-    m_slMargin->setValue(static_cast<int>(p.margin * 100.0f));
+    m_wLocalSlider->setValue(static_cast<int>(p.wLocal * 100.0f));
+    m_thetaSlider->setValue(static_cast<int>(p.thetaScale * 100.0f));
+    m_marginSlider->setValue(static_cast<int>(p.margin * 100.0f));
 
-    m_slKappa->setValue(static_cast<int>(p.switchKappa * 10.0f));
-    m_slHysGrow->setValue(static_cast<int>(p.hysGrow * 1000.0f));
-    m_slHysDecay->setValue(static_cast<int>(p.hysDecay * 1000.0f));
+    m_wDMSlider->setValue(static_cast<int>(p.wDM * 100.0f));
+    m_wBroadcastSlider->setValue(static_cast<int>(p.wBroadcast * 100.0f));
+    m_wSocialSlider->setValue(static_cast<int>(p.wSocial * 100.0f));
 
-    m_slWLocal->setValue(static_cast<int>(p.wLocal * 100.0f));
-    m_slWBroadcast->setValue(static_cast<int>(p.wBroadcast * 100.0f));
-    m_slWSocial->setValue(static_cast<int>(p.wSocial * 100.0f));
-    m_slWDM->setValue(static_cast<int>(p.wDM * 100.0f));
+    m_kappaSlider->setValue(static_cast<int>(p.switchKappa * 100.0f));
+    m_hysGrowSlider->setValue(static_cast<int>(p.hysGrow * 1000.0f));
+    m_hysDecaySlider->setValue(static_cast<int>(p.hysDecay * 1000.0f));
+
+    m_broadcastDecaySlider->setValue(static_cast<int>(p.broadcastDecay * 1000.0f));
+    m_broadcastStockMaxSlider->setValue(static_cast<int>(p.broadcastStockMax * 100.0f));
+    m_broadcastHysGain->setValue(static_cast<int>(p.broadcastHysGain * 1000.0f));
+    m_broadcastHysMax->setValue(static_cast<int>(p.broadcastHysMax * 100.0f));
+    m_broadcastNeutralWeight->setValue(static_cast<int>(p.broadcastNeutralWeight * 100.f));
 
     updateAllValueLabels();
 

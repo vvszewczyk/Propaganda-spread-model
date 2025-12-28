@@ -42,14 +42,21 @@ class WorldPhysicsWidget : public QWidget
                             const QString& tooltip);
         void updateAllValueLabels();
 
-        QSlider* m_slTheta{nullptr};    // Odporność
-        QSlider* m_slMargin{nullptr};   // Odporność
-        QSlider* m_slKappa{nullptr};    // Histereza (Bezwładność)
-        QSlider* m_slHysGrow{nullptr};  // Szybkość utwierdzania
-        QSlider* m_slHysDecay{nullptr}; // Szybkość zapominania
+        QSlider* m_wLocalSlider{nullptr}; // Waga sąsiadów
+        QSlider* m_thetaSlider{nullptr};  // Odporność
+        QSlider* m_marginSlider{nullptr};
 
-        QSlider* m_slWLocal{nullptr};     // Waga sąsiadów
-        QSlider* m_slWBroadcast{nullptr}; // Zaufanie do mediów
-        QSlider* m_slWSocial{nullptr};    // Zaufanie do internetu
-        QSlider* m_slWDM{nullptr};        // Zaufanie do reklam
+        QSlider* m_wDMSlider{nullptr};        // Zaufanie do reklam
+        QSlider* m_wBroadcastSlider{nullptr}; // Zaufanie do mediów
+        QSlider* m_wSocialSlider{nullptr};    // Zaufanie do internetu
+
+        QSlider* m_kappaSlider{nullptr};    // Histereza (Bezwładność)
+        QSlider* m_hysGrowSlider{nullptr};  // Szybkość utwierdzania
+        QSlider* m_hysDecaySlider{nullptr}; // Szybkość zapominania
+
+        QSlider* m_broadcastDecaySlider{nullptr};
+        QSlider* m_broadcastStockMaxSlider{nullptr};
+        QSlider* m_broadcastHysGain{nullptr};
+        QSlider* m_broadcastHysMax{nullptr};
+        QSlider* m_broadcastNeutralWeight{nullptr};
 };
