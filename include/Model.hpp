@@ -12,11 +12,19 @@
 
 struct BaseParameters
 {
-        float broadcastDecay         = 0.02f; // 2% wygaszenia/iterację (dobierzesz)
+        float broadcastDecay         = 0.02f; // 2% wygaszenia/iterację
         float broadcastNeutralWeight = 0.2f;  // jak mocno broadcast wpływa neutralnych (perswazja)
         float broadcastHysGain  = 0.02f; // jak mocno broadcast wzmacnia histerezę zwolenników
-        float broadcastHysMax   = 2.0f;  // clamp, żeby histereza nie urosła w kosmos
         float broadcastStockMax = 1.0f;
+
+        float openMindDM     = 0.25f; // [0..1]
+        float openMindSocial = 0.35f; // [0..1]
+
+        // Histereza z DM / Social: wzmacnianie vs erozja (skalowane |sygnałem|)
+        float dmHysGain      = 0.03f;  // ~[0..0.10]
+        float dmHysErode     = 0.02f;  // ~[0..0.10]
+        float socialHysGain  = 0.02f;  // ~[0..0.10]
+        float socialHysErode = 0.015f; // ~[0..0.10]
 
         float wBroadcast = 0.0f, wSocial = 0.0f,
               wDM = 0.0f; // wagi ile "warte" są poszczególne kanały (Broadcast, Social, DM) w
@@ -29,8 +37,8 @@ struct BaseParameters
 
         // Histereza (utrudnia zmianę A<->B)
         float switchKappa = 0.5f;  // κ: jak histereza podbija próg zmiany strony
-        float hysGrow     = 0.02f; // jak szybko rośnie histereza przy zgodnych bodźcach
         float hysDecay    = 0.01f; // jak szybko zanika bez wsparcia
+        float hysMaxTotal = 2.0f;  // clamp, żeby histereza nie urosła w kosmos
 };
 
 struct Controls // dokładają sygnał do kanału na korzyść strony gracza w danym kroku
@@ -72,5 +80,4 @@ struct GlobalSignals
         float dmPressure     = 0.0f;
 
         [[nodiscard]] float broadcastBias() const { return broadcastA - broadcastB; }
-        [[nodiscard]] float sumDMSocial() const { return socialPressure + dmPressure; }
 };

@@ -29,6 +29,28 @@ namespace
         return white * Config::Simulation::kEffWhite + grey * Config::Simulation::kEffGray +
                black * Config::Simulation::kEffBlack;
     }
+
+    inline float applyOpenMind(Side side, float signal, float openMindFactor)
+    {
+        // [0..1]
+        openMindFactor = std::clamp(openMindFactor, 0.0f, 1.0f);
+
+        if (side == Side::NONE)
+        {
+            return signal;
+        }
+
+        // Jeśli sygnał zgodny z poglądem -> przepuść w 100%
+        // Jeśli przeciwny -> stłum przez openMindFactor
+        if (side == Side::A)
+        {
+            return (signal >= 0.0f) ? signal : signal * openMindFactor;
+        }
+        else // Side::B
+        {
+            return (signal <= 0.0f) ? signal : signal * openMindFactor;
+        }
+    }
 } // namespace
 
 Simulation::Simulation(int cols, int rows)
@@ -38,7 +60,7 @@ Simulation::Simulation(int cols, int rows)
       m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
       m_rng{std::random_device{}()}
 {
-    seedRandomly(500, 500);
+    seedRandomly(5, 5);
     buildSocialNetwork(0.05f);
 }
 
@@ -304,20 +326,23 @@ float Simulation::calculateSocialInfluence(std::size_t i) const
 }
 
 float Simulation::applyBroadcastPersuasionForNeutrals(const CellData&      currentCell,
-                                                      float                baseH,
+                                                      float                baseInfluence,
                                                       const GlobalSignals& globalSignals) const
 {
-    if (currentCell.side == Side::NONE)
+    if (currentCell.side not_eq Side::NONE)
     {
-        const float stockMax   = std::max(1e-6f, m_parameters.broadcastStockMax);
-        float       biasNorm   = globalSignals.broadcastBias() / stockMax;
-        biasNorm               = std::clamp(biasNorm, -1.0f, 1.0f);
-        constexpr float kAlpha = 3.0f; // 2.0 - 6.0
-        const float     shaped = std::tanh(kAlpha * biasNorm);
-        return baseH + (m_parameters.broadcastNeutralWeight * shaped);
+        return baseInfluence; // Zwolennicy nie zmieniają zdania na podstawie TV/radio
     }
 
-    return baseH;
+    float bias = globalSignals.broadcastBias();
+    // Normalizacja względem max nasycenia, żeby tanh działał w przewidywalnym zakresie
+    float normBias =
+        std::clamp(bias / std::max(1e-6f, m_parameters.broadcastStockMax), -1.0f, 1.0f);
+
+    // Kształtowanie krzywej wpływu mediów
+    constexpr float kAlpha     = 3.0f;
+    float           shapedBias = std::tanh(kAlpha * normBias);
+    return baseInfluence + (m_parameters.broadcastNeutralWeight * shapedBias);
 }
 
 void Simulation::applyBroadcastReinforcementForSupporters(const CellData&      currentCell,
@@ -332,7 +357,7 @@ void Simulation::applyBroadcastReinforcementForSupporters(const CellData&      c
         const double boost =
             static_cast<double>(m_parameters.broadcastHysGain * chosenSignalStrength);
 
-        nextCell.hysteresis = std::min<double>(static_cast<double>(m_parameters.broadcastHysMax),
+        nextCell.hysteresis = std::min<double>(static_cast<double>(m_parameters.hysMaxTotal),
                                                nextCell.hysteresis + boost);
     }
 }
@@ -380,7 +405,7 @@ void Simulation::buildSocialNetwork(float rewiringProb)
             do
             {
                 k = randomCell(m_rng);
-            } while (k == neighbourId or not m_currentGrid[k].active);
+            } while (k == neighbourId or k == i or not m_currentGrid[k].active);
 
             neighbourId = k;
         }
@@ -418,10 +443,54 @@ void Simulation::buildSocialNetwork(float rewiringProb)
     }
 }
 
+inline void Simulation::applyChannelHysteresis(const CellData& currentCell,
+                                               CellData&       nextCell,
+                                               float           perceivedSignal,
+                                               float           gain,
+                                               float           erode,
+                                               float           hysMax)
+{
+    if (currentCell.side == Side::NONE)
+    {
+        return;
+    }
+
+    if (nextCell.side not_eq currentCell.side)
+    {
+        return;
+    }
+
+    const float mag = std::tanh(std::abs(perceivedSignal));
+
+    const bool consistent = (currentCell.side == Side::A and perceivedSignal > 0.0f) or
+                            (currentCell.side == Side::B and perceivedSignal < 0.0f);
+
+    const bool opposing = (currentCell.side == Side::A and perceivedSignal < 0.0f) or
+                          (currentCell.side == Side::B and perceivedSignal > 0.0f);
+
+    double h = nextCell.hysteresis;
+
+    if (consistent)
+    {
+        h += static_cast<double>(gain * mag);
+    }
+    else if (opposing)
+    {
+        h -= static_cast<double>(erode * mag);
+    }
+
+    h = std::clamp(h, 0.0, static_cast<double>(hysMax));
+
+    nextCell.hysteresis = h;
+}
+
 void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell, float h)
 {
     const float theta  = static_cast<float>(currentCell.threshold) * m_parameters.thetaScale;
     const float margin = m_parameters.margin;
+
+    nextCell.hysteresis =
+        std::max(0.0, currentCell.hysteresis - static_cast<double>(m_parameters.hysDecay));
 
     if (currentCell.side == Side::NONE)
     {
@@ -433,15 +502,11 @@ void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell
         {
             nextCell.side = Side::B;
         }
-
-        // If neutral -> hysteresis decrease
-        nextCell.hysteresis =
-            std::max(0.0, currentCell.hysteresis - static_cast<double>(m_parameters.hysDecay));
     }
     else
     {
         const float resistance =
-            1.0f + m_parameters.switchKappa * static_cast<float>(currentCell.hysteresis);
+            1.0f + m_parameters.switchKappa * static_cast<float>(nextCell.hysteresis);
         const float effectiveTheta = theta * resistance;
 
         if (currentCell.side == Side::A)
@@ -451,14 +516,6 @@ void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell
                 nextCell.side       = Side::B;
                 nextCell.hysteresis = 0.0;
             }
-            else
-            {
-                if (h > 0)
-                {
-                    nextCell.hysteresis =
-                        currentCell.hysteresis + static_cast<double>(m_parameters.hysGrow);
-                }
-            }
         }
         else if (currentCell.side == Side::B)
         {
@@ -466,14 +523,6 @@ void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell
             {
                 nextCell.side       = Side::A;
                 nextCell.hysteresis = 0.0;
-            }
-            else
-            {
-                if (h < 0)
-                {
-                    nextCell.hysteresis =
-                        currentCell.hysteresis + static_cast<double>(m_parameters.hysGrow);
-                }
             }
         }
     }
@@ -503,16 +552,33 @@ void Simulation::step()
                 continue;
             }
 
-            const float dmPressure = calculateDMInfluence(x, y, globalSignals);
-            const float socialPressure =
-                m_parameters.wSocial * calculateSocialInfluence(i) + globalSignals.socialPressure;
-            const float baseH = dmPressure + socialPressure;
+            const float rawDM   = calculateNeighbourInfluence(x, y);
+            const float totalDM = (rawDM * m_parameters.wLocal) + globalSignals.dmPressure;
 
-            const float h = applyBroadcastPersuasionForNeutrals(currentCell, baseH, globalSignals);
+            const float rawSocial = calculateSocialInfluence(i);
+            const float totalSocial =
+                (m_parameters.wSocial * rawSocial) + globalSignals.socialPressure;
+
+            const float perceivedDM =
+                applyOpenMind(currentCell.side, totalDM, m_parameters.openMindDM);
+            const float perceivedSocial =
+                applyOpenMind(currentCell.side, totalSocial, m_parameters.openMindSocial);
+
+            const float baseInfluence = perceivedDM + perceivedSocial;
+
+            const float h =
+                applyBroadcastPersuasionForNeutrals(currentCell, baseInfluence, globalSignals);
 
             updateCellState(currentCell, nextCell, h);
 
             applyBroadcastReinforcementForSupporters(currentCell, nextCell, globalSignals);
+
+            applyChannelHysteresis(currentCell, nextCell, perceivedDM, m_parameters.dmHysGain,
+                                   m_parameters.dmHysErode, m_parameters.hysMaxTotal);
+
+            applyChannelHysteresis(currentCell, nextCell, perceivedSocial,
+                                   m_parameters.socialHysGain, m_parameters.socialHysErode,
+                                   m_parameters.hysMaxTotal);
         }
     }
     m_currentGrid.swap(m_nextGrid);
@@ -523,7 +589,7 @@ void Simulation::step()
                            << "  decay =" << m_parameters.broadcastDecay << "\n"
                            << "  neutralWeight =" << m_parameters.broadcastNeutralWeight << "\n"
                            << "  hysGain =" << m_parameters.broadcastHysGain << "\n"
-                           << "  hysMax =" << m_parameters.broadcastHysMax << "\n"
+                           << "  hysMaxTotal =" << m_parameters.hysMaxTotal << "\n"
                            << "  stockMax =" << m_parameters.broadcastStockMax << "\n"
                            << " Weights:\n"
                            << "  wBroadcast =" << m_parameters.wBroadcast << "\n"
@@ -535,7 +601,6 @@ void Simulation::step()
                            << "  margin =" << m_parameters.margin << "\n"
                            << " Hysteresis:\n"
                            << "  switchKappa =" << m_parameters.switchKappa << "\n"
-                           << "  hysGrow =" << m_parameters.hysGrow << "\n"
                            << "  hysDecay =" << m_parameters.hysDecay;
     }
     ++m_iteration;

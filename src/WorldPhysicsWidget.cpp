@@ -44,7 +44,7 @@ WorldPhysicsWidget::WorldPhysicsWidget(QWidget* parent) : QWidget(parent)
     addParamSlider(layout, "wBroadcast (Media Confidence)", m_wBroadcastSlider, 0, 100, 20, 100.0,
                    2, "Confidence in global broadcast/media. Range: 0..1.0");
 
-    addParamSlider(layout, "wSocial (Social Network)", m_wSocialSlider, 0, 100, 0, 100.0, 2,
+    addParamSlider(layout, "wSocial (Social Network)", m_wSocialSlider, 0, 100, 35, 100.0, 2,
                    "Confidence in social connections. Range: 0..1.0 (Keep 0 if no graph)");
 
     addHeader("Hysteresis");
@@ -52,13 +52,12 @@ WorldPhysicsWidget::WorldPhysicsWidget(QWidget* parent) : QWidget(parent)
     addParamSlider(layout, "switchKappa (Resistance)", m_kappaSlider, 0, 200, 50, 100.0, 2,
                    "Resistance to change (Switch Kappa). Range: 0..2.0");
 
-    addParamSlider(layout, "hysGrow (Reinforcement)", m_hysGrowSlider, 0, 50, 20, 1000.0, 3,
-                   "Rate of opinion hardening. Range: 0..0.050");
-
     addParamSlider(layout, "hysDecay (Forgetting)", m_hysDecaySlider, 0, 50, 10, 1000.0, 3,
                    "Rate of opinion decay. Range: 0..0.050");
 
-    // --- GROUP 4: Broadcast Mechanics ---
+    addParamSlider(layout, "hysMaxTotal (Hysteresis Limit)", m_hysMaxTotalSlider, 0, 500, 200,
+                   100.0, 2, "Range: 0..5.0");
+
     addHeader("Broadcast Mechanics");
 
     addParamSlider(layout, "broadcastDecay (Exposure Decay)", m_broadcastDecaySlider, 0, 200, 20,
@@ -69,9 +68,6 @@ WorldPhysicsWidget::WorldPhysicsWidget(QWidget* parent) : QWidget(parent)
 
     addParamSlider(layout, "broadcastHysGain (Hysteresis Gain)", m_broadcastHysGain, 0, 50, 20,
                    1000.0, 3, "Reinforcement from media. Range: 0..0.050");
-
-    addParamSlider(layout, "broadcastHysMax (Hysteresis Limit)", m_broadcastHysMax, 0, 500, 200,
-                   100.0, 2, "Limit of reinforcement from media. Range: 0..5.0");
 
     addParamSlider(layout, "broadcastNeutralWeight", m_broadcastNeutralWeight, 0, 100, 15, 100, 2,
                    "");
@@ -148,13 +144,13 @@ BaseParameters WorldPhysicsWidget::getParameters() const
     p.wSocial    = static_cast<float>(m_wSocialSlider->value()) / 100.f;
 
     p.switchKappa = static_cast<float>(m_kappaSlider->value()) / 100.f;
-    p.hysGrow     = static_cast<float>(m_hysGrowSlider->value()) / 1000.f;
     p.hysDecay    = static_cast<float>(m_hysDecaySlider->value()) / 1000.f;
+    p.hysMaxTotal = static_cast<float>(m_hysMaxTotalSlider->value()) / 100.f;
 
-    p.broadcastDecay         = static_cast<float>(m_broadcastDecaySlider->value()) / 1000.f;
-    p.broadcastStockMax      = static_cast<float>(m_broadcastStockMaxSlider->value()) / 100.f;
-    p.broadcastHysGain       = static_cast<float>(m_broadcastHysGain->value()) / 1000.f;
-    p.broadcastHysMax        = static_cast<float>(m_broadcastHysMax->value()) / 100.f;
+    p.broadcastDecay    = static_cast<float>(m_broadcastDecaySlider->value()) / 1000.f;
+    p.broadcastStockMax = static_cast<float>(m_broadcastStockMaxSlider->value()) / 100.f;
+    p.broadcastHysGain  = static_cast<float>(m_broadcastHysGain->value()) / 1000.f;
+
     p.broadcastNeutralWeight = static_cast<float>(m_broadcastNeutralWeight->value()) / 100.f;
 
     return p;
@@ -186,13 +182,12 @@ void WorldPhysicsWidget::setParameters(const BaseParameters& p)
     m_wSocialSlider->setValue(static_cast<int>(p.wSocial * 100.0f));
 
     m_kappaSlider->setValue(static_cast<int>(p.switchKappa * 100.0f));
-    m_hysGrowSlider->setValue(static_cast<int>(p.hysGrow * 1000.0f));
     m_hysDecaySlider->setValue(static_cast<int>(p.hysDecay * 1000.0f));
+    m_hysMaxTotalSlider->setValue(static_cast<int>(p.hysMaxTotal * 100.0f));
 
     m_broadcastDecaySlider->setValue(static_cast<int>(p.broadcastDecay * 1000.0f));
     m_broadcastStockMaxSlider->setValue(static_cast<int>(p.broadcastStockMax * 100.0f));
     m_broadcastHysGain->setValue(static_cast<int>(p.broadcastHysGain * 1000.0f));
-    m_broadcastHysMax->setValue(static_cast<int>(p.broadcastHysMax * 100.0f));
     m_broadcastNeutralWeight->setValue(static_cast<int>(p.broadcastNeutralWeight * 100.f));
 
     updateAllValueLabels();

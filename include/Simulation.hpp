@@ -31,7 +31,8 @@ class Simulation
 
     private:
         [[nodiscard]] GlobalSignals calculateCampaignImpact();
-        [[nodiscard]] float         calculateNeighbourInfluence(int x, int y) const;
+
+        [[nodiscard]] float calculateNeighbourInfluence(int x, int y) const;
         [[nodiscard]] float
         calculateDMInfluence(int x, int y, const GlobalSignals& globalSignals) const;
         [[nodiscard]] float calculateSocialInfluence(std::size_t i) const;
@@ -42,6 +43,12 @@ class Simulation
                                                       CellData&            nextCell,
                                                       const GlobalSignals& globalSignals) const;
         void buildSocialNetwork(float rewiringProb);
+        void applyChannelHysteresis(const CellData& currentCell,
+                                    CellData&       nextCell,
+                                    float           perceivedSignal,
+                                    float           gain,
+                                    float           erode,
+                                    float           hysMax);
         void updateCellState(const CellData& currentCell, CellData& nextCell, float h);
 
     private:

@@ -50,13 +50,12 @@ class WorldPhysicsWidget : public QWidget
         QSlider* m_wBroadcastSlider{nullptr}; // Zaufanie do mediów
         QSlider* m_wSocialSlider{nullptr};    // Zaufanie do internetu
 
-        QSlider* m_kappaSlider{nullptr};    // Histereza (Bezwładność)
-        QSlider* m_hysGrowSlider{nullptr};  // Szybkość utwierdzania
-        QSlider* m_hysDecaySlider{nullptr}; // Szybkość zapominania
+        QSlider* m_kappaSlider{nullptr};       // Histereza (Bezwładność)
+        QSlider* m_hysMaxTotalSlider{nullptr}; // clamp histerezy, żeby nie rosła w kosmos
+        QSlider* m_hysDecaySlider{nullptr};    // Szybkość zapominania
 
         QSlider* m_broadcastDecaySlider{nullptr};
         QSlider* m_broadcastStockMaxSlider{nullptr};
         QSlider* m_broadcastHysGain{nullptr};
-        QSlider* m_broadcastHysMax{nullptr};
         QSlider* m_broadcastNeutralWeight{nullptr};
 };
