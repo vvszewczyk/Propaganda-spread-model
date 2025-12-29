@@ -34,13 +34,14 @@ class Simulation
         [[nodiscard]] float         calculateNeighbourInfluence(int x, int y) const;
         [[nodiscard]] float
         calculateDMInfluence(int x, int y, const GlobalSignals& globalSignals) const;
-        [[nodiscard]] float calculateSocialPressure(const GlobalSignals& globalSignals) const;
+        [[nodiscard]] float calculateSocialInfluence(std::size_t i) const;
         [[nodiscard]] float applyBroadcastPersuasionForNeutrals(
             const CellData& currentCell, float baseH, const GlobalSignals& globalSignals) const;
 
         void applyBroadcastReinforcementForSupporters(const CellData&      currentCell,
                                                       CellData&            nextCell,
                                                       const GlobalSignals& globalSignals) const;
+        void buildSocialNetwork(float rewiringProb);
         void updateCellState(const CellData& currentCell, CellData& nextCell, float h);
 
     private:
@@ -56,6 +57,8 @@ class Simulation
 
         float m_broadcastStockA = 0.0f;
         float m_broadcastStockB = 0.0f;
+
+        std::vector<std::vector<std::size_t>> m_socialGraph;
 
         NeighbourhoodType m_neighbourhoodType{};
 

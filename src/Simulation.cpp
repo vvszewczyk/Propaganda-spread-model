@@ -38,7 +38,8 @@ Simulation::Simulation(int cols, int rows)
       m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
       m_rng{std::random_device{}()}
 {
-    this->seedRandomly(500, 500);
+    seedRandomly(500, 500);
+    buildSocialNetwork(0.05f);
 }
 
 void Simulation::setParameters(const BaseParameters& params)
@@ -55,6 +56,7 @@ void Simulation::setPlayers(const Player& A, const Player& B)
 void Simulation::setNeighbourhoodType(NeighbourhoodType type)
 {
     m_neighbourhoodType = type;
+    buildSocialNetwork(0.05f);
 }
 
 int Simulation::getIteration() const
@@ -94,6 +96,7 @@ void Simulation::reset()
     m_broadcastStockB = 0.0f;
 
     seedRandomly(500, 500);
+    buildSocialNetwork(0.05f);
 }
 
 CellData& Simulation::cellAt(int x, int y)
@@ -272,9 +275,32 @@ float Simulation::calculateDMInfluence(int x, int y, const GlobalSignals& global
     return (neighborsInfluence * m_parameters.wLocal) + globalSignals.dmPressure;
 }
 
-float Simulation::calculateSocialPressure(const GlobalSignals& globalSignals) const
+float Simulation::calculateSocialInfluence(std::size_t i) const
 {
-    return globalSignals.socialPressure;
+    if (i >= m_socialGraph.size())
+    {
+        return 0.0f;
+    }
+
+    float hSocial = 0.0f;
+    int   count   = 0;
+
+    for (std::size_t neighbor : m_socialGraph[i])
+    {
+        if (not m_currentGrid[neighbor].active)
+        {
+            continue;
+        }
+        if (m_currentGrid[neighbor].side == Side::NONE)
+        {
+            continue;
+        }
+
+        hSocial += getSideScalar(m_currentGrid[neighbor].side);
+        ++count;
+    }
+
+    return (count == 0) ? 0.0f : (hSocial / static_cast<float>(count));
 }
 
 float Simulation::applyBroadcastPersuasionForNeutrals(const CellData&      currentCell,
@@ -308,6 +334,87 @@ void Simulation::applyBroadcastReinforcementForSupporters(const CellData&      c
 
         nextCell.hysteresis = std::min<double>(static_cast<double>(m_parameters.broadcastHysMax),
                                                nextCell.hysteresis + boost);
+    }
+}
+
+void Simulation::buildSocialNetwork(float rewiringProb)
+{
+    std::size_t totalCells = static_cast<std::size_t>(m_cols) * static_cast<std::size_t>(m_rows);
+    m_socialGraph.assign(totalCells, {});
+
+    std::span<const QVector2D> offsets =
+        (m_neighbourhoodType == NeighbourhoodType::MOORE)
+            ? std::span<const QVector2D>(Config::Neighbourhood::MOORE)
+            : std::span<const QVector2D>(Config::Neighbourhood::VN);
+
+    std::uniform_real_distribution<float>      dis(0.0f, 1.0f);
+    std::uniform_int_distribution<std::size_t> randomCell(0, totalCells - 1);
+
+    auto idx = [&](int x, int y)
+    {
+        return static_cast<std::size_t>(y) * static_cast<std::size_t>(m_cols) +
+               static_cast<std::size_t>(x);
+    };
+
+    auto wrap = [&](int index, int range)
+    {
+        int result = index % range;
+        if (result < 0)
+        {
+            result += range;
+        }
+        return result;
+    };
+
+    auto applyRewiringRule = [&](int x, int y, std::size_t i)
+    {
+        std::size_t neighbourId = idx(x, y);
+        if (not m_currentGrid[neighbourId].active)
+        {
+            return;
+        }
+
+        if (dis(m_rng) < rewiringProb)
+        {
+            std::size_t k = neighbourId;
+            do
+            {
+                k = randomCell(m_rng);
+            } while (k == neighbourId or not m_currentGrid[k].active);
+
+            neighbourId = k;
+        }
+
+        if (std::find(m_socialGraph[i].begin(), m_socialGraph[i].end(), neighbourId) ==
+            m_socialGraph[i].end())
+        {
+            m_socialGraph[i].push_back(neighbourId);
+        }
+
+        if (std::find(m_socialGraph[neighbourId].begin(), m_socialGraph[neighbourId].end(), i) ==
+            m_socialGraph[neighbourId].end())
+        {
+            m_socialGraph[neighbourId].push_back(i);
+        }
+    };
+
+    for (int y = 0; y < m_rows; ++y)
+    {
+        for (int x = 0; x < m_cols; ++x)
+        {
+            const std::size_t i = idx(x, y);
+            if (not m_currentGrid[i].active)
+            {
+                continue;
+            }
+
+            for (const auto& offset : offsets)
+            {
+                const int nx = wrap(x + static_cast<int>(offset.x()), m_cols);
+                const int ny = wrap(y + static_cast<int>(offset.y()), m_rows);
+                applyRewiringRule(nx, ny, i);
+            }
+        }
     }
 }
 
@@ -396,9 +503,10 @@ void Simulation::step()
                 continue;
             }
 
-            const float dmPressure     = calculateDMInfluence(x, y, globalSignals);
-            const float socialPressure = calculateSocialPressure(globalSignals);
-            const float baseH          = dmPressure + socialPressure;
+            const float dmPressure = calculateDMInfluence(x, y, globalSignals);
+            const float socialPressure =
+                m_parameters.wSocial * calculateSocialInfluence(i) + globalSignals.socialPressure;
+            const float baseH = dmPressure + socialPressure;
 
             const float h = applyBroadcastPersuasionForNeutrals(currentCell, baseH, globalSignals);
 
