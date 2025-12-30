@@ -60,7 +60,7 @@ Simulation::Simulation(int cols, int rows)
       m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
       m_rng{std::random_device{}()}
 {
-    seedRandomly(500, 500);
+    seedRandomly(2500, 2500);
     buildSocialNetwork(0.05f);
 }
 
@@ -96,6 +96,11 @@ int Simulation::getRows() const
     return m_rows;
 }
 
+const StepStats& Simulation::getlastStepStats() const
+{
+    return m_lastStepStats;
+}
+
 Player Simulation::getPlayerA() const
 {
     return m_playerA;
@@ -117,7 +122,7 @@ void Simulation::reset()
     m_broadcastStockA = 0.0f;
     m_broadcastStockB = 0.0f;
 
-    seedRandomly(500, 500);
+    seedRandomly(2500, 2500);
     buildSocialNetwork(0.05f);
 }
 
@@ -187,7 +192,7 @@ void Simulation::seedRandomly(int countA, int countB)
     setThresholdRandomly();
 }
 
-GlobalSignals Simulation::calculateCampaignImpact()
+GlobalSignals Simulation::calculateCampaignImpact(CampaignDiag& outDiag)
 {
     // Calculate how much players want to spend
     float costA = m_playerA.calculatePlannedCost();
@@ -202,51 +207,61 @@ GlobalSignals Simulation::calculateCampaignImpact()
     m_playerA.budget -= costA * scaleA;
     m_playerB.budget -= costB * scaleB;
 
+    outDiag.logFinancials(costA, costB, scaleA, scaleB);
+
     GlobalSignals globalSignals;
     const auto&   controlsA = m_playerA.controls;
     const auto&   controlsB = m_playerB.controls;
 
-    // clang-format off
     // Broadcast
-    const float bA = computeChannelStrength(controlsA.whiteBroadcast,
-                                             controlsA.greyBroadcast,
-                                            controlsA.blackBroadcast) * scaleA;
-    const float bB = computeChannelStrength(controlsB.whiteBroadcast,
-                                             controlsB.greyBroadcast,
-                                            controlsB.blackBroadcast) * scaleB;
-    //globalSignals.broadcastPressure = m_parameters.wBroadcast * (bA - bB);
+    const float bA = computeChannelStrength(controlsA.whiteBroadcast, controlsA.greyBroadcast,
+                                            controlsA.blackBroadcast) *
+                     scaleA;
+    const float bB = computeChannelStrength(controlsB.whiteBroadcast, controlsB.greyBroadcast,
+                                            controlsB.blackBroadcast) *
+                     scaleB;
+    // globalSignals.broadcastPressure = m_parameters.wBroadcast * (bA - bB);
 
     m_broadcastStockA *= (1.0f - m_parameters.broadcastDecay);
     m_broadcastStockB *= (1.0f - m_parameters.broadcastDecay);
     m_broadcastStockA += bA;
     m_broadcastStockB += bB;
-    m_broadcastStockA = std::clamp(m_broadcastStockA, 0.0f, m_parameters.broadcastStockMax);
-    m_broadcastStockB = std::clamp(m_broadcastStockB, 0.0f, m_parameters.broadcastStockMax);
+    m_broadcastStockA        = std::clamp(m_broadcastStockA, 0.0f, m_parameters.broadcastStockMax);
+    m_broadcastStockB        = std::clamp(m_broadcastStockB, 0.0f, m_parameters.broadcastStockMax);
     globalSignals.broadcastA = m_parameters.wBroadcast * m_broadcastStockA;
     globalSignals.broadcastB = m_parameters.wBroadcast * m_broadcastStockB;
 
-
     // Social
-    float sA = computeChannelStrength(controlsA.whiteSocial,
-                                       controlsA.greySocial,
-                                      controlsA.blackSocial) * scaleA;
-    float sB = computeChannelStrength(controlsB.whiteSocial,
-                                       controlsB.greySocial,
-                                      controlsB.blackSocial) * scaleB;
+    float sA =
+        computeChannelStrength(controlsA.whiteSocial, controlsA.greySocial, controlsA.blackSocial) *
+        scaleA;
+    float sB =
+        computeChannelStrength(controlsB.whiteSocial, controlsB.greySocial, controlsB.blackSocial) *
+        scaleB;
     globalSignals.socialPressure = m_parameters.wSocial * (sA - sB);
 
     // DM
     float dA =
-        computeChannelStrength(controlsA.whiteDM,
-                                controlsA.greyDM,
-                               controlsA.blackDM) * scaleA;
+        computeChannelStrength(controlsA.whiteDM, controlsA.greyDM, controlsA.blackDM) * scaleA;
     float dB =
-        computeChannelStrength(controlsB.whiteDM,
-                                controlsB.greyDM,
-                               controlsB.blackDM) * scaleB;
+        computeChannelStrength(controlsB.whiteDM, controlsB.greyDM, controlsB.blackDM) * scaleB;
     globalSignals.dmPressure = m_parameters.wDM * (dA - dB);
 
-    // clang-format on
+    outDiag.logStock(m_broadcastStockA, m_broadcastStockB);
+    outDiag.effA_broadcast = bA;
+    outDiag.effB_broadcast = bB;
+    outDiag.effA_social    = sA;
+    outDiag.effB_social    = sB;
+    outDiag.effA_dm        = dA;
+    outDiag.effB_dm        = dB;
+
+    outDiag.ctrlA_broadcast_sum = controlsA.sumBroadcast();
+    outDiag.ctrlB_broadcast_sum = controlsB.sumBroadcast();
+    outDiag.ctrlA_dm_sum        = controlsA.sumDM();
+    outDiag.ctrlB_dm_sum        = controlsB.sumDM();
+    outDiag.ctrlA_social_sum    = controlsA.sumSocial();
+    outDiag.ctrlB_social_sum    = controlsB.sumSocial();
+
     return globalSignals;
 }
 
@@ -530,8 +545,17 @@ void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell
 
 void Simulation::step()
 {
-    m_nextGrid                        = m_currentGrid;
-    const GlobalSignals globalSignals = calculateCampaignImpact();
+    StepStats currentStats{};
+    currentStats.iter           = m_iteration;
+    currentStats.paramsSnapshot = m_parameters;
+
+    m_nextGrid = m_currentGrid;
+
+    const GlobalSignals globalSignals = calculateCampaignImpact(currentStats.campaign);
+
+    currentStats.gSignals = globalSignals;
+    currentStats.budgetA  = m_playerA.budget;
+    currentStats.budgetB  = m_playerB.budget;
 
     auto idx = [&](int x, int y)
     {
@@ -571,6 +595,8 @@ void Simulation::step()
 
             updateCellState(currentCell, nextCell, h);
 
+            currentStats.trans.record(currentCell.side, nextCell.side);
+
             applyBroadcastReinforcementForSupporters(currentCell, nextCell, globalSignals);
 
             applyChannelHysteresis(currentCell, nextCell, perceivedDM, m_parameters.dmHysGain,
@@ -579,9 +605,17 @@ void Simulation::step()
             applyChannelHysteresis(currentCell, nextCell, perceivedSocial,
                                    m_parameters.socialHysGain, m_parameters.socialHysErode,
                                    m_parameters.hysMaxTotal);
+
+            currentStats.addCell(nextCell);
         }
     }
+
+    currentStats.finalize();
+
     m_currentGrid.swap(m_nextGrid);
+
+    m_lastStepStats = currentStats;
+
     if (m_iteration % 50 == 0)
     {
         qDebug().noquote() << "iter" << m_iteration << "\n"

@@ -4,6 +4,7 @@
 #include "PlayerControlWidget.hpp"
 #include "Simulation.hpp"
 #include "SimulationControlWidget.hpp"
+#include "StatsWidget.hpp"
 #include "UsMap.hpp"
 #include "WorldPhysicsWidget.hpp"
 
@@ -15,8 +16,6 @@
 #include <QTimer>
 #include <QtWidgets>
 #include <memory>
-// #include <QtCharts>
-// #include <QtWidgets/QMainWindow>
 
 namespace app::ui
 {
@@ -45,7 +44,7 @@ namespace app::ui
             {
                     QStackedWidget* contentStack{nullptr};
                     GridWidget*     gridWidget{nullptr};
-                    QWidget*        statsWidget{nullptr};
+                    StatsWidget*    statsWidget{nullptr};
 
                     SimulationControlWidget* simulationControlWidget{nullptr};
                     QTabWidget*              tabsWidget{nullptr};
@@ -96,8 +95,7 @@ namespace app::ui
             void refreshBudgets();
             void setupPhysicsDock();
 
-            void setupStats();
-            void updateStats(int globalStep);
+            void updateStats();
             void clearStats();
 
         private slots:

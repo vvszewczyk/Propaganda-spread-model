@@ -3,6 +3,7 @@
 #include "GridWidget.hpp"
 #include "PlayerControlWidget.hpp"
 #include "SimulationControlWidget.hpp"
+#include "StatsWidget.hpp"
 #include "WorldPhysicsWidget.hpp"
 
 #include <QBoxLayout>
@@ -48,7 +49,7 @@ void MainWindow::createWidgets()
     ui.gridWidget->setSimulation(model.simulation.get());
     ui.gridWidget->setFixedSize(Config::Grid::pixelWidth, Config::Grid::pixelHeight);
 
-    ui.statsWidget = new QWidget(this);
+    ui.statsWidget = new StatsWidget(this);
 
     ui.contentStack->addWidget(ui.gridWidget);
     ui.contentStack->addWidget(ui.statsWidget);
@@ -233,7 +234,7 @@ void MainWindow::wireAll()
     wireGrid();
     wireTogglesAndView();
 
-    connect(model.timer, &QTimer::timeout, this, [this] { doStep(); });
+    connect(model.timer, &QTimer::timeout, this, &MainWindow::doStep, Qt::UniqueConnection);
 }
 
 void MainWindow::wireSimulationControls()
@@ -379,10 +380,7 @@ void MainWindow::doStep()
     updateIterationLabel();
     refreshBudgets();
 
-    if (ui.contentStack->currentIndex() == static_cast<int>(Page::Stats))
-    {
-        // updateStats(globalStep);
-    }
+    updateStats();
 }
 
 void MainWindow::onStartClicked()
@@ -441,8 +439,8 @@ void MainWindow::onToggleView(bool checked)
     ui.contentStack->setCurrentIndex(checked ? static_cast<int>(Page::Stats)
                                              : static_cast<int>(Page::Simulation));
 
-    ui.toggleViewButton->setText(checked ? QStringLiteral("Show simulation")
-                                         : QStringLiteral("Show stats"));
+    ui.toggleViewButton->setText(checked ? Config::UiText::showSimulation
+                                         : Config::UiText::showStats);
 }
 
 void MainWindow::onNeighbourhoodChanged(int index)
@@ -463,14 +461,12 @@ void MainWindow::onSimulationSpeedChanged(int speed)
     model.timer->setInterval(newInterval);
 }
 
-void MainWindow::setupStats()
+void MainWindow::updateStats()
 {
-}
-
-void MainWindow::updateStats(int globalStep)
-{
+    ui.statsWidget->pushSample(model.simulation->getlastStepStats());
 }
 
 void MainWindow::clearStats()
 {
+    ui.statsWidget->clear();
 }

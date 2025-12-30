@@ -27,49 +27,49 @@ WorldPhysicsWidget::WorldPhysicsWidget(QWidget* parent) : QWidget(parent)
 
     addHeader("Model Interactions");
 
-    addParamSlider(layout, "wLocal (Neighbor Weight)", m_wLocalSlider, 0, 200, 120, 100.0, 2,
+    addParamSlider(layout, "wLocal (Neighbor Weight)", m_wLocalSlider, 0, 200, 55, 100.0, 2,
                    "Influence of neighbors (DM). Range: 0..2.0");
 
-    addParamSlider(layout, "thetaScale (Susceptibility)", m_thetaSlider, 20, 200, 100, 100.0, 2,
+    addParamSlider(layout, "thetaScale (Susceptibility)", m_thetaSlider, 20, 200, 130, 100.0, 2,
                    "Scales the cell threshold. Range: 0.2..2.0");
 
-    addParamSlider(layout, "margin (Indifference Zone)", m_marginSlider, 0, 20, 5, 100.0, 2,
+    addParamSlider(layout, "margin (Indifference Zone)", m_marginSlider, 0, 20, 6, 100.0, 2,
                    "Stability control: larger margin means fewer state flips. Range: 0..0.20");
 
     addHeader("Channel Weights");
 
-    addParamSlider(layout, "wDM (Self Confidence)", m_wDMSlider, 0, 100, 25, 100.0, 2,
+    addParamSlider(layout, "wDM (Self Confidence)", m_wDMSlider, 0, 100, 30, 100.0, 2,
                    "Confidence in own decision. Range: 0..1.0");
 
-    addParamSlider(layout, "wBroadcast (Media Confidence)", m_wBroadcastSlider, 0, 100, 20, 100.0,
+    addParamSlider(layout, "wBroadcast (Media Confidence)", m_wBroadcastSlider, 0, 100, 35, 100.0,
                    2, "Confidence in global broadcast/media. Range: 0..1.0");
 
-    addParamSlider(layout, "wSocial (Social Network)", m_wSocialSlider, 0, 100, 35, 100.0, 2,
+    addParamSlider(layout, "wSocial (Social Network)", m_wSocialSlider, 0, 100, 12, 100.0, 2,
                    "Confidence in social connections. Range: 0..1.0 (Keep 0 if no graph)");
 
     addHeader("Hysteresis");
 
-    addParamSlider(layout, "switchKappa (Resistance)", m_kappaSlider, 0, 200, 50, 100.0, 2,
+    addParamSlider(layout, "switchKappa (Resistance)", m_kappaSlider, 0, 200, 25, 100.0, 2,
                    "Resistance to change (Switch Kappa). Range: 0..2.0");
 
-    addParamSlider(layout, "hysDecay (Forgetting)", m_hysDecaySlider, 0, 50, 10, 1000.0, 3,
+    addParamSlider(layout, "hysDecay (Forgetting)", m_hysDecaySlider, 0, 50, 20, 1000.0, 3,
                    "Rate of opinion decay. Range: 0..0.050");
 
-    addParamSlider(layout, "hysMaxTotal (Hysteresis Limit)", m_hysMaxTotalSlider, 0, 500, 200,
+    addParamSlider(layout, "hysMaxTotal (Hysteresis Limit)", m_hysMaxTotalSlider, 0, 500, 140,
                    100.0, 2, "Range: 0..5.0");
 
     addHeader("Broadcast Mechanics");
 
-    addParamSlider(layout, "broadcastDecay (Exposure Decay)", m_broadcastDecaySlider, 0, 200, 20,
+    addParamSlider(layout, "broadcastDecay (Exposure Decay)", m_broadcastDecaySlider, 0, 200, 15,
                    1000.0, 3, "Range: 0..0.200");
 
     addParamSlider(layout, "broadcastStockMax (Max Exposure)", m_broadcastStockMaxSlider, 50, 300,
-                   100, 100.0, 2, "Range: 0.5..3.0");
+                   160, 100.0, 2, "Range: 0.5..3.0");
 
-    addParamSlider(layout, "broadcastHysGain (Hysteresis Gain)", m_broadcastHysGain, 0, 50, 20,
+    addParamSlider(layout, "broadcastHysGain (Hysteresis Gain)", m_broadcastHysGain, 0, 50, 10,
                    1000.0, 3, "Reinforcement from media. Range: 0..0.050");
 
-    addParamSlider(layout, "broadcastNeutralWeight", m_broadcastNeutralWeight, 0, 100, 15, 100, 2,
+    addParamSlider(layout, "broadcastNeutralWeight", m_broadcastNeutralWeight, 0, 100, 30, 100, 2,
                    "");
 
     layout->addStretch();

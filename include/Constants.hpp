@@ -40,8 +40,8 @@ namespace Config
         inline const QString start             = QStringLiteral("Start");
         inline const QString reset             = QStringLiteral("Reset");
         inline const QString step              = QStringLiteral("Step");
-        inline const QString showStats         = QStringLiteral("Show stats");
-        inline const QString showSimulation    = QStringLiteral("Show simulation");
+        inline const QString showStats         = QStringLiteral("Stats");
+        inline const QString showSimulation    = QStringLiteral("Simulation");
         inline const QString showGrid          = QStringLiteral("Show grid");
         inline const QString neighbourhood     = QStringLiteral("Neighbourhood:");
         inline const QString vonNeumann        = QStringLiteral("Von Neumann");

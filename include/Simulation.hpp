@@ -1,5 +1,6 @@
 #pragma once
 #include "Model.hpp"
+#include "SimulationResults.hpp"
 #include "Types.hpp"
 
 #include <random>
@@ -23,6 +24,8 @@ class Simulation
         [[nodiscard]] int getCols() const;
         [[nodiscard]] int getRows() const;
 
+        [[nodiscard]] const StepStats& getlastStepStats() const;
+
         [[nodiscard]] Player getPlayerA() const;
         [[nodiscard]] Player getPlayerB() const;
 
@@ -30,7 +33,7 @@ class Simulation
         [[nodiscard]] const CellData& cellAt(int x, int y) const;
 
     private:
-        [[nodiscard]] GlobalSignals calculateCampaignImpact();
+        [[nodiscard]] GlobalSignals calculateCampaignImpact(CampaignDiag& outDiag);
 
         [[nodiscard]] float calculateNeighbourInfluence(int x, int y) const;
         [[nodiscard]] float
@@ -56,7 +59,9 @@ class Simulation
         int                   m_rows;
         std::vector<CellData> m_currentGrid;
         std::vector<CellData> m_nextGrid;
-        int                   m_iteration{0};
+        int                   m_iteration{};
+
+        StepStats m_lastStepStats{};
 
         BaseParameters m_parameters{};
         Player         m_playerA{};

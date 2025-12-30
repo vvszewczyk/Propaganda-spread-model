@@ -1,14 +1,4 @@
 #pragma once
-#include "Types.hpp"
-
-// Broadcast to jest "TV/internet/sondaże", globalny szum, który dodaje ekspozycję każdej komórce w
-// zależności od tego, ile A/B inwestuje w *Broadcast
-
-// Social to byłby dodatkowy, bardziej skomplikowany kanał losowych połączeń między komórkami
-// (niekoniecznie sąsiadujących w siatce)
-
-// DM to "lokalne rozmowy / prywatne wiadomości", które w CA są po prostu wpływem sąsiadów w
-// siatce (NeighbourhoodType, wLocal).
 
 struct BaseParameters
 {
@@ -17,14 +7,15 @@ struct BaseParameters
         float broadcastHysGain  = 0.02f; // jak mocno broadcast wzmacnia histerezę zwolenników
         float broadcastStockMax = 1.0f;
 
-        float openMindDM     = 0.25f; // [0..1]
-        float openMindSocial = 0.35f; // [0..1]
+        // TODO: zrobić suwaki do 6 poniższych
+        float openMindDM     = 0.55f; // [0..1]
+        float openMindSocial = 0.60f; // [0..1]
 
         // Histereza z DM / Social: wzmacnianie vs erozja (skalowane |sygnałem|)
-        float dmHysGain      = 0.03f;  // ~[0..0.10]
-        float dmHysErode     = 0.02f;  // ~[0..0.10]
-        float socialHysGain  = 0.02f;  // ~[0..0.10]
-        float socialHysErode = 0.015f; // ~[0..0.10]
+        float dmHysGain      = 0.02f;  // ~[0..0.10]
+        float dmHysErode     = 0.04f;  // ~[0..0.10]
+        float socialHysGain  = 0.015f; // ~[0..0.10]
+        float socialHysErode = 0.03f;  // ~[0..0.10]
 
         float wBroadcast = 0.0f, wSocial = 0.0f,
               wDM = 0.0f; // wagi ile "warte" są poszczególne kanały (Broadcast, Social, DM) w
@@ -58,7 +49,7 @@ struct Player
         Controls controls; // "pokrętła" jak mocno dana strona używa danego kanału/koloru propagandy
                            // w danym kroku, inaczej intensywność sygnału
         float budget    = 1000.0f; // budżet jaki gracz może przeznaczyć na kampanię
-        float costWhite = 1.0, costGrey = 2.0, costBlack = 3.0;
+        float costWhite = 1.0f, costGrey = 1.2f, costBlack = 1.5f;
 
         [[nodiscard]] float calculatePlannedCost() const
         {
