@@ -57,8 +57,8 @@ struct Player
 {
         Controls controls; // "pokrętła" jak mocno dana strona używa danego kanału/koloru propagandy
                            // w danym kroku, inaczej intensywność sygnału
-        float  budget    = 1000.0f; // budżet jaki gracz może przeznaczyć na kampanię
-        double costWhite = 1.0, costGrey = 2.0, costBlack = 3.0;
+        float budget    = 1000.0f; // budżet jaki gracz może przeznaczyć na kampanię
+        float costWhite = 1.0, costGrey = 2.0, costBlack = 3.0;
 
         [[nodiscard]] float calculatePlannedCost() const
         {

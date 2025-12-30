@@ -118,6 +118,8 @@ Controls PlayerControlWidget::getControls() const
 
 void PlayerControlWidget::updateBudgetDisplay(float currentBudget, float plannedCost)
 {
-    m_budgetLabel->setText(QString("Budget: $%1").arg(static_cast<int>(currentBudget)));
-    m_costLabel->setText(QString("Planned Cost: $%1").arg(static_cast<int>(plannedCost)));
+    m_budgetLabel->setText(
+        QString("Budget: $%1").arg(static_cast<double>(currentBudget), 0, 'f', 2));
+    m_costLabel->setText(
+        QString("Planned Cost: $%1").arg(static_cast<double>(plannedCost), 0, 'f', 2));
 }

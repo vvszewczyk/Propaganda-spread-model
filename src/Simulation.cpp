@@ -60,7 +60,7 @@ Simulation::Simulation(int cols, int rows)
       m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
       m_rng{std::random_device{}()}
 {
-    seedRandomly(5, 5);
+    seedRandomly(500, 500);
     buildSocialNetwork(0.05f);
 }
 
