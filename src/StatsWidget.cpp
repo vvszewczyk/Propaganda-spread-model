@@ -268,11 +268,15 @@ void StatsWidget::saveCsv()
     const QString path =
         QFileDialog::getSaveFileName(this, "Save stats as CSV", "stats.csv", "CSV (*.csv)");
     if (path.isEmpty())
+    {
         return;
+    }
 
     QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+    if (not f.open(QIODevice::WriteOnly bitor QIODevice::Truncate bitor QIODevice::Text))
+    {
         return;
+    }
 
     QTextStream out(&f);
     out << "iter,active,countA,countB,countN,shareA,shareB,shareN,"

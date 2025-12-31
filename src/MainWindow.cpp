@@ -95,7 +95,7 @@ void MainWindow::createWidgets()
     ui.fpsLabel  = makeWidget<QLabel>(ui.gridWidget, nullptr, Config::UiText::fps + "0");
 
     QString error;
-    if (!model.usMap->buildStateProducts(&error))
+    if (not model.usMap->buildStateProducts(&error))
     {
         qWarning() << "Failed to build map: " << error;
     }
@@ -106,10 +106,11 @@ void MainWindow::setupPhysicsDock()
 {
     ui.physicsDock = new QDockWidget(tr("Settings"), this);
 
-    ui.physicsDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea |
+    ui.physicsDock->setAllowedAreas(Qt::LeftDockWidgetArea bitor Qt::RightDockWidgetArea bitor
                                     Qt::BottomDockWidgetArea);
 
-    ui.physicsDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    ui.physicsDock->setFeatures(QDockWidget::DockWidgetMovable bitor
+                                QDockWidget::DockWidgetFloatable);
 
     auto* scroll = new QScrollArea(ui.physicsDock);
     scroll->setWidgetResizable(true);
@@ -138,7 +139,7 @@ void MainWindow::setupPhysicsDock()
     connect(ui.physicsDock, &QDockWidget::visibilityChanged, this,
             [this](bool visible)
             {
-                if (ui.physicsButton->isChecked() != visible)
+                if (ui.physicsButton->isChecked() not_eq visible)
                 {
                     ui.physicsButton->blockSignals(true);
                     ui.physicsButton->setChecked(visible);
@@ -194,7 +195,7 @@ void MainWindow::buildLayout()
     // Cell info
     ui.cellInfoLabel->setFrameShape(QFrame::StyledPanel);
     ui.cellInfoLabel->setFrameShadow(QFrame::Plain);
-    ui.cellInfoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    ui.cellInfoLabel->setAlignment(Qt::AlignLeft bitor Qt::AlignTop);
     ui.cellInfoLabel->setMinimumHeight(60);
     ui.cellInfoLabel->setWordWrap(true);
     ui.cellInfoLabel->setStyleSheet(
@@ -213,11 +214,11 @@ void MainWindow::buildLayout()
     rightLayout->addWidget(ui.iterationLabel, 0, Qt::AlignRight);
 
     // Overlay styling
-    ui.fpsLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui.fpsLabel->setAlignment(Qt::AlignLeft bitor Qt::AlignVCenter);
     ui.fpsLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     ui.fpsLabel->setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
 
-    ui.zoomLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui.zoomLabel->setAlignment(Qt::AlignLeft bitor Qt::AlignVCenter);
     ui.zoomLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     ui.zoomLabel->setStyleSheet(
         "background-color: rgba(0, 0, 0, 128); color: white; padding: 1px;");
@@ -278,7 +279,7 @@ void MainWindow::wireGrid()
             [this](double zoomFactor)
             {
                 int percent = static_cast<int>(zoomFactor * 100.0 + 0.5);
-                if (percent == 99 || percent == 101)
+                if (percent == 99 or percent == 101)
                 {
                     percent = 100;
                 }

@@ -101,13 +101,13 @@ QColor GridWidget::getColorFor(CellData cell) const noexcept
 
 void GridWidget::drawGrid(QPainter& painter) const
 {
-    if (!m_usMap || !m_showGrid)
+    if (not m_usMap or not m_showGrid)
     {
         return;
     }
 
     const auto& products = m_usMap->getProducts();
-    if (products.cols <= 0 || products.rows <= 0)
+    if (products.cols <= 0 or products.rows <= 0)
     {
         return;
     }
@@ -175,13 +175,13 @@ void GridWidget::drawOuterFrame(QPainter& painter) const
 
 void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
 {
-    if (!m_usMap)
+    if (not m_usMap)
     {
         return;
     }
 
     const QPoint cell = productPointFromWidgetPos(pos);
-    if (cell.x() < 0 || cell.y() < 0)
+    if (cell.x() < 0 or cell.y() < 0)
     {
         return;
     }
@@ -197,12 +197,12 @@ void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
         stateId = sid;
     }
 
-    if (buttons & Qt::LeftButton)
+    if (buttons bitand Qt::LeftButton)
     {
         emit paintCellRequested(cell.x(), cell.y(), Side::A);
     }
 
-    if (buttons & Qt::RightButton)
+    if (buttons bitand Qt::RightButton)
     {
         emit paintCellRequested(cell.x(), cell.y(), Side::B);
     }
@@ -212,14 +212,14 @@ void GridWidget::applyBrushAt(const QPointF& pos, Qt::MouseButtons buttons)
 
 void GridWidget::updateCellInfoAt(const QPointF& position)
 {
-    if (!m_usMap || !m_sim)
+    if (not m_usMap or not m_sim)
     {
         emit cellInfoChanged(QString());
         return;
     }
 
     const QPoint cell = productPointFromWidgetPos(position);
-    if (cell.x() < 0 || cell.y() < 0)
+    if (cell.x() < 0 or cell.y() < 0)
     {
         emit cellInfoChanged(QString());
         return;
@@ -243,7 +243,7 @@ void GridWidget::updateCellInfoAt(const QPointF& position)
         break;
     }
 
-    if (!m_mapMode)
+    if (not m_mapMode)
     {
         const QString info = QStringLiteral("Cell (%1, %2):\nState=%3\nThreshold=%4\nHysteresis=%5")
                                  .arg(cell.x())
@@ -298,12 +298,12 @@ GridWidget::Geometry GridWidget::computeGeometry(qreal zoom) const
 
 QRectF GridWidget::mapDestRect() const
 {
-    if (!m_usMap)
+    if (not m_usMap)
     {
         return {};
     }
     const auto& products = m_usMap->getProducts();
-    if (products.cols <= 0 || products.rows <= 0)
+    if (products.cols <= 0 or products.rows <= 0)
         return QRectF();
 
     const Geometry g = computeGeometry(m_zoom);
@@ -317,19 +317,19 @@ QRectF GridWidget::mapDestRect() const
 
 void GridWidget::rebuildCellsImageIfNeeded() const
 {
-    if (!m_usMap || !m_sim)
+    if (not m_usMap or not m_sim)
     {
         return;
     }
 
     const auto& products = m_usMap->getProducts();
-    if (products.cols <= 0 || products.rows <= 0)
+    if (products.cols <= 0 or products.rows <= 0)
     {
         return;
     }
 
     const QSize imgSize(products.cols, products.rows);
-    if (m_cellsImage.size() != imgSize)
+    if (m_cellsImage.size() not_eq imgSize)
     {
         m_cellsImage = QImage(imgSize, QImage::Format_ARGB32_Premultiplied);
     }
@@ -342,7 +342,7 @@ void GridWidget::rebuildCellsImageIfNeeded() const
         for (int x = 0; x < products.cols; ++x)
         {
             const int index = y * products.cols + x;
-            if (useMask && !products.activeStates[static_cast<std::size_t>(index)])
+            if (useMask and not products.activeStates[static_cast<std::size_t>(index)])
             {
                 continue;
             }
@@ -352,7 +352,7 @@ void GridWidget::rebuildCellsImageIfNeeded() const
             const int    stateId = products.stateIds[static_cast<std::size_t>(index)];
             const QPoint cellPoint{x, y};
 
-            if (useMask && m_coloredStates.contains(stateId))
+            if (useMask and m_coloredStates.contains(stateId))
             {
                 color = m_coloredStates.value(stateId);
             }
@@ -364,19 +364,19 @@ void GridWidget::rebuildCellsImageIfNeeded() const
 
 QPoint GridWidget::productPointFromWidgetPos(QPointF pos) const
 {
-    if (!m_usMap)
+    if (not m_usMap)
     {
         return QPoint{-1, -1};
     }
 
     const auto& products = m_usMap->getProducts();
-    if (products.cols <= 0 || products.rows <= 0)
+    if (products.cols <= 0 or products.rows <= 0)
     {
         return QPoint{-1, -1};
     }
 
     const QRectF dest = mapDestRect();
-    if (!dest.isValid())
+    if (not dest.isValid())
     {
         return QPoint{-1, -1};
     }
@@ -387,7 +387,7 @@ QPoint GridWidget::productPointFromWidgetPos(QPointF pos) const
     const int ix = static_cast<int>(std::floor(fx * static_cast<float>(products.cols)));
     const int iy = static_cast<int>(std::floor(fy * static_cast<float>(products.rows)));
 
-    if (ix < 0 || iy < 0 || ix >= products.cols || iy >= products.rows)
+    if (ix < 0 or iy < 0 or ix >= products.cols or iy >= products.rows)
     {
         return QPoint{-1, -1};
     }
@@ -397,19 +397,19 @@ QPoint GridWidget::productPointFromWidgetPos(QPointF pos) const
 
 uint8_t GridWidget::stateAtWidgetPos(QPointF pos) const
 {
-    if (!m_usMap)
+    if (not m_usMap)
     {
         return UsMap::kNoState;
     }
 
     const auto& products = m_usMap->getProducts();
-    if (products.cols <= 0 || products.rows <= 0)
+    if (products.cols <= 0 or products.rows <= 0)
     {
         return UsMap::kNoState;
     }
 
     const QPoint cell = productPointFromWidgetPos(pos);
-    if (cell.x() < 0 || cell.y() < 0)
+    if (cell.x() < 0 or cell.y() < 0)
     {
         return UsMap::kNoState;
     }
@@ -423,8 +423,10 @@ uint8_t GridWidget::stateAtWidgetPos(QPointF pos) const
 
 QString GridWidget::tooltipTextForState(uint8_t stateId) const
 {
-    if (!m_usMap)
+    if (not m_usMap)
+    {
         return {};
+    }
 
     const QString full = m_usMap->getStateName(stateId);
     const QString abbr = m_usMap->getStateId(stateId);
@@ -434,7 +436,7 @@ QString GridWidget::tooltipTextForState(uint8_t stateId) const
         return abbr;
     }
 
-    if (abbr.isEmpty() || full.compare(abbr, Qt::CaseInsensitive) == 0)
+    if (abbr.isEmpty() or full.compare(abbr, Qt::CaseInsensitive) == 0)
     {
         return full;
     }
@@ -476,7 +478,7 @@ void GridWidget::paintEvent(QPaintEvent*)
     }
 
     const QRectF destRectF = mapDestRect();
-    if (!destRectF.isValid())
+    if (not destRectF.isValid())
     {
         return;
     }
@@ -511,13 +513,13 @@ void GridWidget::mousePressEvent(QMouseEvent* event)
         return event->accept();
     }
 
-    if (!m_usMap)
+    if (not m_usMap)
     {
         return;
     }
 
     const QPoint cell = productPointFromWidgetPos(event->pos());
-    if (cell.x() < 0 || cell.y() < 0)
+    if (cell.x() < 0 or cell.y() < 0)
     {
         return;
     }
@@ -590,13 +592,13 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
         return event->accept();
     }
 
-    if (m_paintMode and (event->buttons() & (Qt::LeftButton | Qt::RightButton)))
+    if (m_paintMode and (event->buttons() bitand (Qt::LeftButton bitor Qt::RightButton)))
     {
         applyBrushAt(event->position(), event->buttons());
         return event->accept();
     }
 
-    if (!m_usMap)
+    if (not m_usMap)
     {
         return;
     }
@@ -604,7 +606,7 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
     if (m_mapMode)
     {
         const QPoint cell     = productPointFromWidgetPos(event->pos());
-        const int    newHover = (cell.x() < 0 || cell.y() < 0)
+        const int    newHover = (cell.x() < 0 or cell.y() < 0)
                                     ? -1
                                     : (cell.y() * m_usMap->getProducts().cols + cell.x());
 
@@ -616,7 +618,7 @@ void GridWidget::mouseMoveEvent(QMouseEvent* event)
 
         m_hoverSid = newHover;
 
-        if (newHover != -1)
+        if (newHover not_eq -1)
         {
             const QString txt = QStringLiteral("Cell (%1, %2)").arg(cell.x()).arg(cell.y());
             QToolTip::hideText();
@@ -642,18 +644,18 @@ void GridWidget::leaveEvent(QEvent* event)
 
 void GridWidget::wheelEvent(QWheelEvent* event)
 {
-    if (!(event->modifiers() & Qt::ControlModifier))
+    if (not(event->modifiers() bitand Qt::ControlModifier))
     {
         return QWidget::wheelEvent(event);
     }
 
-    if (!m_usMap)
+    if (not m_usMap)
     {
         return event->ignore();
     }
 
     const auto& products = m_usMap->getProducts();
-    if (products.cols <= 0 || products.rows <= 0)
+    if (products.cols <= 0 or products.rows <= 0)
     {
         return event->ignore();
     }
@@ -681,7 +683,7 @@ void GridWidget::wheelEvent(QWheelEvent* event)
 
 void GridWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_isPanning && event->button() == Qt::MiddleButton)
+    if (m_isPanning and event->button() == Qt::MiddleButton)
     {
         m_isPanning = false;
         unsetCursor();

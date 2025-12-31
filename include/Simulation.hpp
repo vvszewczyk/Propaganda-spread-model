@@ -33,6 +33,11 @@ class Simulation
         [[nodiscard]] const CellData& cellAt(int x, int y) const;
 
     private:
+        [[nodiscard]] inline std::size_t idx(int x, int y) const
+        {
+            return static_cast<std::size_t>(y) * static_cast<std::size_t>(m_cols) +
+                   static_cast<std::size_t>(x);
+        }
         [[nodiscard]] GlobalSignals calculateCampaignImpact(CampaignDiag& outDiag);
 
         [[nodiscard]] float calculateNeighbourInfluence(int x, int y) const;

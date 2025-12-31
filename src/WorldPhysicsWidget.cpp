@@ -105,7 +105,7 @@ void WorldPhysicsWidget::addParamSlider(QVBoxLayout*   layout,
 
     auto* value = new QLabel(this);
     value->setToolTip(tooltip);
-    value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    value->setAlignment(Qt::AlignRight bitor Qt::AlignVCenter);
     value->setFixedWidth(64);
     value->setStyleSheet("font-family: Consolas, monospace;");
 
@@ -160,7 +160,7 @@ void WorldPhysicsWidget::updateAllValueLabels()
 {
     for (const auto& b : m_bindings)
     {
-        if (not b.slider || not b.valueLabel)
+        if (not b.slider or not b.valueLabel)
         {
             continue;
         }

@@ -61,7 +61,7 @@ QGroupBox* PlayerControlWidget::createChannelGroup(const QString& title,
 
         auto* valueLbl = new QLabel("0.00");
         valueLbl->setFixedWidth(44);
-        valueLbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        valueLbl->setAlignment(Qt::AlignRight bitor Qt::AlignVCenter);
         valueLbl->setStyleSheet("color: gray; font-family: Consolas, monospace; font-size: 10px;");
 
         auto updateValue = [valueLbl](int v)

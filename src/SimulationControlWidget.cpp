@@ -82,7 +82,7 @@ int SimulationControlWidget::getSpeed() const
 
 void SimulationControlWidget::setNeighbourhood(int index)
 {
-    if (index < 0 || index >= m_neighbourhoodCombo->count())
+    if (index < 0 or index >= m_neighbourhoodCombo->count())
     {
         return;
     }

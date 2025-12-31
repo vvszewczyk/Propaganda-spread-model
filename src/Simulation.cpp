@@ -176,7 +176,7 @@ void Simulation::seedRandomly(int countA, int countB)
                 continue;
             }
 
-            if (cell.side != Side::NONE)
+            if (cell.side not_eq Side::NONE)
             {
                 continue;
             }
@@ -267,17 +267,11 @@ GlobalSignals Simulation::calculateCampaignImpact(CampaignDiag& outDiag)
 
 float Simulation::calculateNeighbourInfluence(int x, int y) const
 {
-    auto idx = [&](int xn, int yn)
-    {
-        return static_cast<std::size_t>(yn) * static_cast<std::size_t>(m_cols) +
-               static_cast<std::size_t>(xn);
-    };
-
     float hDM                 = 0.0f;
     int   count               = 0;
     auto  accumulateNeighbour = [&](int nx, int ny)
     {
-        if (nx < 0 || ny < 0 || nx >= m_cols || ny >= m_rows)
+        if (nx < 0 or ny < 0 or nx >= m_cols or ny >= m_rows)
         {
             return;
         }
@@ -286,7 +280,7 @@ float Simulation::calculateNeighbourInfluence(int x, int y) const
         {
             return;
         }
-        if (neighborCell.side != Side::NONE)
+        if (neighborCell.side not_eq Side::NONE)
         {
             hDM += getSideScalar(neighborCell.side);
             ++count;
@@ -364,7 +358,7 @@ void Simulation::applyBroadcastReinforcementForSupporters(const CellData&      c
                                                           CellData&            nextCell,
                                                           const GlobalSignals& globalSignals) const
 {
-    if (nextCell.side != Side::NONE and nextCell.side == currentCell.side)
+    if (nextCell.side not_eq Side::NONE and nextCell.side == currentCell.side)
     {
         const float chosenSignalStrength =
             (nextCell.side == Side::A) ? globalSignals.broadcastA : globalSignals.broadcastB;
@@ -389,12 +383,6 @@ void Simulation::buildSocialNetwork(float rewiringProb)
 
     std::uniform_real_distribution<float>      dis(0.0f, 1.0f);
     std::uniform_int_distribution<std::size_t> randomCell(0, totalCells - 1);
-
-    auto idx = [&](int x, int y)
-    {
-        return static_cast<std::size_t>(y) * static_cast<std::size_t>(m_cols) +
-               static_cast<std::size_t>(x);
-    };
 
     auto wrap = [&](int index, int range)
     {
@@ -556,12 +544,6 @@ void Simulation::step()
     currentStats.gSignals = globalSignals;
     currentStats.budgetA  = m_playerA.budget;
     currentStats.budgetB  = m_playerB.budget;
-
-    auto idx = [&](int x, int y)
-    {
-        return static_cast<std::size_t>(y) * static_cast<std::size_t>(m_cols) +
-               static_cast<std::size_t>(x);
-    };
 
     for (int y = 0; y < m_rows; ++y)
     {
