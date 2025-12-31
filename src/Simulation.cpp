@@ -300,12 +300,6 @@ float Simulation::calculateNeighbourInfluence(int x, int y) const
     return (count == 0) ? 0.0f : hDM / static_cast<float>(count);
 }
 
-float Simulation::calculateDMInfluence(int x, int y, const GlobalSignals& globalSignals) const
-{
-    const float neighborsInfluence = calculateNeighbourInfluence(x, y);
-    return (neighborsInfluence * m_parameters.wLocal) + globalSignals.dmPressure;
-}
-
 float Simulation::calculateSocialInfluence(std::size_t i) const
 {
     if (i >= m_socialGraph.size())

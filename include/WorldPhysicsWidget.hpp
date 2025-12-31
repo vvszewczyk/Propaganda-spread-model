@@ -42,20 +42,29 @@ class WorldPhysicsWidget : public QWidget
                             const QString& tooltip);
         void updateAllValueLabels();
 
-        QSlider* m_wLocalSlider{nullptr}; // Waga sąsiadów
-        QSlider* m_thetaSlider{nullptr};  // Odporność
+    private:
+        QSlider* m_thetaSlider{nullptr}; // Odporność
         QSlider* m_marginSlider{nullptr};
 
+        QSlider* m_wLocalSlider{nullptr};     // Waga sąsiadów
         QSlider* m_wDMSlider{nullptr};        // Zaufanie do reklam
         QSlider* m_wBroadcastSlider{nullptr}; // Zaufanie do mediów
         QSlider* m_wSocialSlider{nullptr};    // Zaufanie do internetu
-
-        QSlider* m_kappaSlider{nullptr};       // Histereza (Bezwładność)
-        QSlider* m_hysMaxTotalSlider{nullptr}; // clamp histerezy, żeby nie rosła w kosmos
-        QSlider* m_hysDecaySlider{nullptr};    // Szybkość zapominania
 
         QSlider* m_broadcastDecaySlider{nullptr};
         QSlider* m_broadcastStockMaxSlider{nullptr};
         QSlider* m_broadcastHysGain{nullptr};
         QSlider* m_broadcastNeutralWeight{nullptr};
+
+        QSlider* m_openMindLocalSlider   = nullptr;
+        QSlider* m_openMindNetworkSlider = nullptr;
+
+        QSlider* m_kappaSlider{nullptr};       // Histereza (Bezwładność)
+        QSlider* m_hysMaxTotalSlider{nullptr}; // clamp histerezy, żeby nie rosła w kosmos
+        QSlider* m_hysDecaySlider{nullptr};    // Szybkość zapominania
+
+        QSlider* m_dmHysGainSlider      = nullptr;
+        QSlider* m_dmHysErodeSlider     = nullptr;
+        QSlider* m_socialHysGainSlider  = nullptr;
+        QSlider* m_socialHysErodeSlider = nullptr;
 };

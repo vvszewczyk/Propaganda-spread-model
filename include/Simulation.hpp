@@ -41,8 +41,6 @@ class Simulation
         [[nodiscard]] GlobalSignals calculateCampaignImpact(CampaignDiag& outDiag);
 
         [[nodiscard]] float calculateNeighbourInfluence(int x, int y) const;
-        [[nodiscard]] float
-        calculateDMInfluence(int x, int y, const GlobalSignals& globalSignals) const;
         [[nodiscard]] float calculateSocialInfluence(std::size_t i) const;
         [[nodiscard]] float applyBroadcastPersuasionForNeutrals(
             const CellData& currentCell, float baseH, const GlobalSignals& globalSignals) const;
