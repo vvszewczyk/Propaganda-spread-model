@@ -60,6 +60,7 @@ Simulation::Simulation(int cols, int rows)
       m_nextGrid{static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows)},
       m_rng{std::random_device{}()}
 {
+    m_flipTracker.assign(static_cast<std::size_t>(cols) * static_cast<std::size_t>(rows), {});
     seedRandomly(2500, 2500);
     buildSocialNetwork(0.05f);
 }
@@ -113,12 +114,11 @@ Player Simulation::getPlayerB() const
 
 void Simulation::reset()
 {
-    m_currentGrid =
-        std::vector<CellData>(static_cast<std::size_t>(m_cols) * static_cast<std::size_t>(m_rows));
-    m_nextGrid =
-        std::vector<CellData>(static_cast<std::size_t>(m_cols) * static_cast<std::size_t>(m_rows));
-    m_iteration = 0;
-
+    std::size_t totalCells = static_cast<std::size_t>(m_cols) * static_cast<std::size_t>(m_rows);
+    m_currentGrid          = std::vector<CellData>(totalCells);
+    m_nextGrid             = std::vector<CellData>(totalCells);
+    m_iteration            = 0;
+    m_flipTracker.assign(totalCells, {});
     m_broadcastStockA = 0.0f;
     m_broadcastStockB = 0.0f;
 
@@ -510,7 +510,7 @@ void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell
         {
             if (h <= -(effectiveTheta + margin))
             {
-                nextCell.side       = Side::B;
+                nextCell.side       = Side::NONE;
                 nextCell.hysteresis = 0.0;
             }
         }
@@ -518,11 +518,49 @@ void Simulation::updateCellState(const CellData& currentCell, CellData& nextCell
         {
             if (h >= effectiveTheta + margin)
             {
-                nextCell.side       = Side::A;
+                nextCell.side       = Side::NONE;
                 nextCell.hysteresis = 0.0;
             }
         }
     }
+}
+
+void Simulation::updateFlipTracker(std::size_t i, Side from, Side to, StepTransitions& trans)
+{
+    auto& tracker = m_flipTracker[i];
+
+    if (to == Side::NONE and (from == Side::A or from == Side::B))
+    {
+        tracker.pendingForm = from;
+        tracker.age         = 0;
+        return;
+    }
+
+    if (from == Side::NONE and to == Side::NONE)
+    {
+        if (tracker.pendingForm not_eq Side::NONE)
+        {
+            ++tracker.age;
+        }
+        return;
+    }
+
+    if (from == Side::NONE and (to == Side::A or to == Side::B))
+    {
+        if (tracker.pendingForm == Side::A and to == Side::B)
+        {
+            ++trans.A_to_B;
+        }
+        else if (tracker.pendingForm == Side::B and to == Side::A)
+        {
+            ++trans.B_to_A;
+        }
+
+        tracker = {};
+        return;
+    }
+
+    tracker = {};
 }
 
 void Simulation::step()
@@ -572,6 +610,7 @@ void Simulation::step()
             updateCellState(currentCell, nextCell, h);
 
             currentStats.trans.record(currentCell.side, nextCell.side);
+            updateFlipTracker(i, currentCell.side, nextCell.side, currentStats.trans);
 
             applyBroadcastReinforcementForSupporters(currentCell, nextCell, globalSignals);
 

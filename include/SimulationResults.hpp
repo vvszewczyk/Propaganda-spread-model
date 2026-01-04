@@ -1,6 +1,8 @@
 #include "Model.hpp"
 #include "Types.hpp"
 
+#include <cstdint>
+
 struct CampaignDiag
 {
         float plannedCostA = 0, plannedCostB = 0;
@@ -37,6 +39,7 @@ struct CampaignDiag
 struct StepTransitions
 {
         int N_to_A = 0, N_to_B = 0;
+        int A_to_NONE = 0, B_to_NONE = 0;
         int A_to_B = 0, B_to_A = 0;
 
         void record(Side from, Side to)
@@ -57,15 +60,21 @@ struct StepTransitions
                     ++N_to_B;
                 }
             }
-            else if (from == Side::A and to == Side::B)
+            else if (from == Side::A and to == Side::NONE)
             {
-                ++A_to_B;
+                ++A_to_NONE;
             }
-            else if (from == Side::B and to == Side::A)
+            else if (from == Side::B and to == Side::NONE)
             {
-                ++B_to_A;
+                ++B_to_NONE;
             }
         }
+};
+
+struct FlipTracker
+{
+        Side    pendingForm = Side::NONE;
+        uint8_t age         = 0; // ile kroków siedzi w NONE od ostatniej zmiany
 };
 
 struct StepStats

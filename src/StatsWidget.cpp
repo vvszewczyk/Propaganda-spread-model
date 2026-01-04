@@ -281,7 +281,7 @@ void StatsWidget::saveCsv()
     QTextStream out(&f);
     out << "iter,active,countA,countB,countN,shareA,shareB,shareN,"
            "avgHysA,avgHysB,"
-           "N_to_A,N_to_B,A_to_B,B_to_A,"
+           "N_to_A,N_to_B,A_to_NONE,B_to_NONE,A_to_B,B_to_A,"
            "budgetA,budgetB,plannedCostA,plannedCostB,scaleA,scaleB,spentA,spentB,"
            "ctrlA_broadcast,ctrlB_broadcast,ctrlA_dm,ctrlB_dm,ctrlA_social,ctrlB_social,"
            "effA_broadcast,effB_broadcast,effA_dm,effB_dm,effA_social,effB_social,"
@@ -293,11 +293,13 @@ void StatsWidget::saveCsv()
     {
         out << s.iter << "," << s.active << "," << s.countA << "," << s.countB << "," << s.countN
             << "," << s.shareA << "," << s.shareB << "," << s.shareN << "," << s.avgHysA << ","
-            << s.avgHysB << "," << s.trans.N_to_A << "," << s.trans.N_to_B << "," << s.trans.A_to_B
-            << "," << s.trans.B_to_A << "," << s.budgetA << "," << s.budgetB << ","
-            << s.campaign.plannedCostA << "," << s.campaign.plannedCostB << "," << s.campaign.scaleA
-            << "," << s.campaign.scaleB << "," << s.campaign.spentA << "," << s.campaign.spentB
-            << "," << s.campaign.ctrlA_broadcast_sum << "," << s.campaign.ctrlB_broadcast_sum << ","
+            << s.avgHysB << "," << s.trans.N_to_A << "," << s.trans.N_to_B << "," << s.trans.N_to_A
+            << "," << s.trans.N_to_B << "," << s.trans.A_to_NONE << "," << s.trans.B_to_NONE << ","
+            << s.trans.A_to_B << "," << s.trans.B_to_A << ","
+            << "," << s.budgetA << "," << s.budgetB << "," << s.campaign.plannedCostA << ","
+            << s.campaign.plannedCostB << "," << s.campaign.scaleA << "," << s.campaign.scaleB
+            << "," << s.campaign.spentA << "," << s.campaign.spentB << ","
+            << s.campaign.ctrlA_broadcast_sum << "," << s.campaign.ctrlB_broadcast_sum << ","
             << s.campaign.ctrlA_dm_sum << "," << s.campaign.ctrlB_dm_sum << ","
             << s.campaign.ctrlA_social_sum << "," << s.campaign.ctrlB_social_sum << ","
             << s.campaign.effA_broadcast << "," << s.campaign.effB_broadcast << ","

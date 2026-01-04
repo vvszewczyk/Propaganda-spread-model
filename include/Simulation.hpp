@@ -56,6 +56,7 @@ class Simulation
                                     float           erode,
                                     float           hysMax);
         void updateCellState(const CellData& currentCell, CellData& nextCell, float h);
+        void updateFlipTracker(std::size_t i, Side from, Side to, StepTransitions& trans);
 
     private:
         int                   m_cols;
@@ -65,6 +66,8 @@ class Simulation
         int                   m_iteration{};
 
         StepStats m_lastStepStats{};
+
+        std::vector<FlipTracker> m_flipTracker;
 
         BaseParameters m_parameters{};
         Player         m_playerA{};
