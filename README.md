@@ -1,6 +1,6 @@
 # Propaganda Spread Model
 
-A simulation of propaganda spreading across the US map, implemented in **C++20** using the **Qt6** framework.
+Model simulating opinion dynamics and information warfare, implemented in **C++20** using the **Qt6** framework.
 
 ## Prerequisites
 
