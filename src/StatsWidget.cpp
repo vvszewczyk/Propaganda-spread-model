@@ -286,6 +286,7 @@ void StatsWidget::saveCsv()
            "ctrlA_broadcast,ctrlB_broadcast,ctrlA_dm,ctrlB_dm,ctrlA_social,ctrlB_social,"
            "effA_broadcast,effB_broadcast,effA_dm,effB_dm,effA_social,effB_social,"
            "stockA,stockB,broadcastA,broadcastB,broadcastBias,dmPressure,socialPressure,"
+           "gridEdgesLike,gridEdgesUnlike,gridEdgesTotal,localHomophily,boundaryRate,"
            "wLocal,thetaScale,margin,wDM,wBroadcast,wSocial,switchKappa,hysDecay,hysMaxTotal,"
            "broadcastDecay,broadcastStockMax,broadcastHysGain,broadcastNeutralWeight\n";
 
@@ -293,27 +294,36 @@ void StatsWidget::saveCsv()
     {
         out << s.iter << "," << s.active << "," << s.countA << "," << s.countB << "," << s.countN
             << "," << s.shareA << "," << s.shareB << "," << s.shareN << "," << s.avgHysA << ","
-            << s.avgHysB << "," << s.trans.N_to_A << "," << s.trans.N_to_B << "," << s.trans.N_to_A
-            << "," << s.trans.N_to_B << "," << s.trans.A_to_NONE << "," << s.trans.B_to_NONE << ","
-            << s.trans.A_to_B << "," << s.trans.B_to_A << ","
+            << s.avgHysB
+
+            << "," << s.trans.N_to_A << "," << s.trans.N_to_B << "," << s.trans.A_to_NONE << ","
+            << s.trans.B_to_NONE << "," << s.trans.A_to_B << "," << s.trans.B_to_A
+
             << "," << s.budgetA << "," << s.budgetB << "," << s.campaign.plannedCostA << ","
             << s.campaign.plannedCostB << "," << s.campaign.scaleA << "," << s.campaign.scaleB
-            << "," << s.campaign.spentA << "," << s.campaign.spentB << ","
-            << s.campaign.ctrlA_broadcast_sum << "," << s.campaign.ctrlB_broadcast_sum << ","
+            << "," << s.campaign.spentA << "," << s.campaign.spentB
+
+            << "," << s.campaign.ctrlA_broadcast_sum << "," << s.campaign.ctrlB_broadcast_sum << ","
             << s.campaign.ctrlA_dm_sum << "," << s.campaign.ctrlB_dm_sum << ","
-            << s.campaign.ctrlA_social_sum << "," << s.campaign.ctrlB_social_sum << ","
-            << s.campaign.effA_broadcast << "," << s.campaign.effB_broadcast << ","
+            << s.campaign.ctrlA_social_sum << "," << s.campaign.ctrlB_social_sum
+
+            << "," << s.campaign.effA_broadcast << "," << s.campaign.effB_broadcast << ","
             << s.campaign.effA_dm << "," << s.campaign.effB_dm << "," << s.campaign.effA_social
-            << "," << s.campaign.effB_social << "," << s.campaign.stockA << "," << s.campaign.stockB
-            << "," << s.gSignals.broadcastA << "," << s.gSignals.broadcastB << ","
-            << s.gSignals.broadcastBias() << "," << s.gSignals.dmPressure << ","
-            << s.gSignals.socialPressure << "," << s.paramsSnapshot.wLocal << ","
-            << s.paramsSnapshot.thetaScale << "," << s.paramsSnapshot.margin << ","
-            << s.paramsSnapshot.wDM << "," << s.paramsSnapshot.wBroadcast << ","
-            << s.paramsSnapshot.wSocial << "," << s.paramsSnapshot.switchKappa << ","
-            << s.paramsSnapshot.hysDecay << "," << s.paramsSnapshot.hysMaxTotal << ","
-            << s.paramsSnapshot.broadcastDecay << "," << s.paramsSnapshot.broadcastStockMax << ","
-            << s.paramsSnapshot.broadcastHysGain << "," << s.paramsSnapshot.broadcastNeutralWeight
-            << "\n";
+            << "," << s.campaign.effB_social
+
+            << "," << s.campaign.stockA << "," << s.campaign.stockB << "," << s.gSignals.broadcastA
+            << "," << s.gSignals.broadcastB << "," << s.gSignals.broadcastBias() << ","
+            << s.gSignals.dmPressure << "," << s.gSignals.socialPressure
+
+            << "," << s.gridEdgesLike << "," << s.gridEdgesUnlike << "," << s.gridEdgesTotal << ","
+            << s.localHomophily << "," << s.boundaryRate
+
+            << "," << s.paramsSnapshot.wLocal << "," << s.paramsSnapshot.thetaScale << ","
+            << s.paramsSnapshot.margin << "," << s.paramsSnapshot.wDM << ","
+            << s.paramsSnapshot.wBroadcast << "," << s.paramsSnapshot.wSocial << ","
+            << s.paramsSnapshot.switchKappa << "," << s.paramsSnapshot.hysDecay << ","
+            << s.paramsSnapshot.hysMaxTotal << "," << s.paramsSnapshot.broadcastDecay << ","
+            << s.paramsSnapshot.broadcastStockMax << "," << s.paramsSnapshot.broadcastHysGain << ","
+            << s.paramsSnapshot.broadcastNeutralWeight << "\n";
     }
 }

@@ -85,6 +85,13 @@ struct StepStats
 
         double avgHysA = 0, avgHysB = 0;
 
+        // Schelling
+        int    gridEdgesLike   = 0;   // A-A + B-B (tylko pary nie-NONE)
+        int    gridEdgesUnlike = 0;   // A-B (tylko pary nie-NONE)
+        int    gridEdgesTotal  = 0;   // like + unlike
+        double localHomophily  = 0.0; // like / total
+        double boundaryRate    = 0.0; // unlike / total
+
         double internalSumHysA = 0;
         double internalSumHysB = 0;
 
@@ -134,5 +141,18 @@ struct StepStats
 
             avgHysA = (countA > 0) ? internalSumHysA / countA : 0.0;
             avgHysB = (countB > 0) ? internalSumHysB / countB : 0.0;
+
+            // Schelling
+            gridEdgesTotal = gridEdgesLike + gridEdgesUnlike;
+            if (gridEdgesTotal > 0)
+            {
+                localHomophily = static_cast<double>(gridEdgesLike) / gridEdgesTotal;
+                boundaryRate   = static_cast<double>(gridEdgesUnlike) / gridEdgesTotal;
+            }
+            else
+            {
+                localHomophily = 0.0;
+                boundaryRate   = 0.0;
+            }
         }
 };

@@ -57,6 +57,8 @@ class Simulation
                                     float           hysMax);
         void updateCellState(const CellData& currentCell, CellData& nextCell, float h);
         void updateFlipTracker(std::size_t i, Side from, Side to, StepTransitions& trans);
+        void computeGridSpatialMetrics(const std::vector<CellData>& grid,
+                                       StepStats&                   outStats) const;
 
     private:
         int                   m_cols;

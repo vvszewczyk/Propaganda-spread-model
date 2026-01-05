@@ -563,6 +563,55 @@ void Simulation::updateFlipTracker(std::size_t i, Side from, Side to, StepTransi
     tracker = {};
 }
 
+void Simulation::computeGridSpatialMetrics(const std::vector<CellData>& grid,
+                                           StepStats&                   outStats) const
+{
+    int like   = 0;
+    int unlike = 0;
+
+    auto considerPair = [&](const CellData& a, const CellData& b)
+    {
+        if (not a.active or not b.active)
+        {
+            return;
+        }
+        if (a.side == Side::NONE or b.side == Side::NONE)
+        {
+            return;
+        }
+
+        if (a.side == b.side)
+        {
+            ++like;
+        }
+        else
+        {
+            ++unlike;
+        }
+    };
+
+    for (int y = 0; y < m_rows; ++y)
+    {
+        for (int x = 0; x < m_cols; ++x)
+        {
+            const CellData& c = grid[idx(x, y)];
+
+            if (x + 1 < m_cols)
+            {
+                considerPair(c, grid[idx(x + 1, y)]);
+            }
+
+            if (y + 1 < m_rows)
+            {
+                considerPair(c, grid[idx(x, y + 1)]);
+            }
+        }
+    }
+
+    outStats.gridEdgesLike   = like;
+    outStats.gridEdgesUnlike = unlike;
+}
+
 void Simulation::step()
 {
     StepStats currentStats{};
@@ -625,6 +674,7 @@ void Simulation::step()
         }
     }
 
+    computeGridSpatialMetrics(m_nextGrid, currentStats);
     currentStats.finalize();
 
     m_currentGrid.swap(m_nextGrid);
